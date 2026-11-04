@@ -172,7 +172,17 @@ methods returning the envelope untouched, because `contextBridge` strips
 custom fields off thrown objects.
 
 ```ts
-type IpcResult<T> = { ok: true; data: T } | { ok: false; error: { code: string; detail: string } }
+type IpcResult<T> =
+  | { ok: true; data: T }
+  | {
+      ok: false;
+      error: {
+        code: string;
+        detail: string;
+        details?: Record<string, unknown>;
+        retryAfterSeconds?: number;
+      };
+    }
 ```
 
 `electron-plugin-keygate/renderer` is the layer that unwraps it, so
@@ -325,6 +335,28 @@ into the future than `maxClockDriftSeconds`.
 
 `KeygateError` is `{ code, detail }`, with the message
 `Keygate Error: {code}: {detail}`.
+
+It carries two more fields when the server sends them:
+
+| Field | Meaning |
+| --- | --- |
+| `details` | The server's `error.details`, verbatim. `max` and `current` for `ACTIVATION_LIMIT`, `retry_after` for `LOCKED_OUT`, `used` and `limit` for `QUOTA_EXCEEDED`. |
+| `retryAfterSeconds` | How long to wait before retrying, from the `Retry-After` header a 429 carries, falling back to `details.retry_after`. |
+
+An app that hit the device limit can therefore say *"2 of 3 devices in use"*
+rather than only *"maximum activations reached"*, and one that hit a lockout
+can say when to try again.
+
+```ts
+try {
+  await keygate.activate({ key });
+} catch (err) {
+  if (isKeygateError(err) && err.code === 'ACTIVATION_LIMIT') {
+    const { max, current } = err.details ?? {};
+    show(`This device cannot be activated: ${current} of ${max} devices are in use.`);
+  }
+}
+```
 
 | Code | Raised by | Meaning |
 | --- | --- | --- |

@@ -31,6 +31,41 @@ So this package is not a drop-in replacement for a Keygen client, and a
 Keygen-shaped detail appearing in the code is a bug rather than a
 compatibility feature.
 
+## What this package is for
+
+**Licensing features inside an Electron app — offline activation above all.**
+It activates a device, keeps a signed token for it, restores that token on
+launch with no network, and gates features on what the license entitles.
+
+It is **not** the place a customer buys a license. Buying, managing seats,
+inviting people, upgrading plans and metering usage all live in the Keygate
+portal or the server's own API; this package never touches them.
+
+The Keygate server exposes eleven license endpoints. This package uses five:
+
+| Endpoint | Used for |
+| --- | --- |
+| `GET /license/pubkey` | the key the server signs tokens with |
+| `POST /license/activate` | register this device, get a token |
+| `POST /license/verify` | check the license and this device |
+| `POST /license/deactivate` | release this device's slot |
+| `POST /license/entitlements` | which features the license grants |
+
+The other six are deliberately out of scope, and the reasons are not
+accidental:
+
+| Not used | Why |
+| --- | --- |
+| `POST /license/usage`, `/usage/status` | metering — how the vendor bills, not how the app licenses itself. The entitlements answer already carries the quota figures an app needs to *show*. |
+| `POST /license/floating/checkout`, `/checkin`, `/heartbeat` | floating licences are a different licensing model: a seat is leased and held, and there is no device-bound token to carry offline. This package's whole premise is the opposite. |
+| `POST /license/download` | the updater's business, not the licensing client's. |
+| `/releases/:product/feed.*` | Sparkle, Velopack and Tauri updater feeds. |
+
+A floating licence is the one case worth naming: the server refuses
+`activate` for one, with `FLOATING_LICENSE`. This package passes that code
+through and says in the message that it does not implement that model,
+rather than sending the app after an endpoint it cannot call.
+
 ## Install
 
 ```sh
