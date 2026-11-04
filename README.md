@@ -361,6 +361,42 @@ so the activation looks like a real one. Release it again with:
 npm run activate:live -- --release <identifier>
 ```
 
+## Licensing a person, not a machine
+
+An activation belongs to **this machine** by default: the identifier is
+derived from the operating system's machine id, hashed, and sent as
+`identifier_type: "device"`.
+
+An app that licenses people rather than machines says so, and names the
+person:
+
+```ts
+await keygate.activate({
+  key,
+  identifier: 'person@example.com',
+  identifierType: 'user',
+});
+```
+
+The `identifier` is then required — the machine id is not a person, so the
+package refuses to use it as one.
+
+## When the server withdraws the license
+
+The server answers `404 LICENSE_NOT_FOUND` for a license that does not exist,
+one that is suspended or revoked, and one where this device has no
+activation. All three mean the same thing to a client: the license does not
+work here.
+
+So a `verify` that fails that way **clears the cached token and the cached
+key**, and the app starts unlicensed on the next launch. Without that, the
+cached token would be restored on every launch and the app would keep
+running licensed on a license the server has withdrawn.
+
+A failure that is not about the license — a lockout, a rate limit — clears
+nothing, and neither does a verify of a *different* key: a customer trying a
+second license does not lose the one this device already has.
+
 ## Deliberately absent
 
 - No arbitrary-invoke channel, no filesystem channel, and no channel that

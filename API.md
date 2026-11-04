@@ -201,7 +201,7 @@ isKeygateError(err): err is { code: string; detail: string }   // cross-realm sa
 | --- | --- | --- | --- |
 | `getLicense()` | — | `KeygateLicense \| null` | `LICENSING_DISABLED`, `UNTRUSTED_SENDER` |
 | `getLicenseKey()` | — | `string \| null` | as above, `STORAGE_*` |
-| `activate({ key, label?, identifier? })` | — | `KeygateLicense` | `NO_IDENTIFIER`, `REQUEST_ERROR`, `BAD_RESPONSE`, `STORAGE_UNAVAILABLE`, server codes |
+| `activate({ key, label?, identifier?, identifierType? })` | — | `KeygateLicense` | `NO_IDENTIFIER`, `REQUEST_ERROR`, `BAD_RESPONSE`, `STORAGE_UNAVAILABLE`, server codes |
 | `verify({ key?, identifier? })` | — | `KeygateLicense` | `NO_LICENSE`, `NOT_FOUND`, server codes |
 | `deactivate({ key?, identifier? })` | — | `void` | `NO_LICENSE`, server codes |
 | `getEntitlements({ key?, feature? })` | — | `KeygateEntitlements` | `NO_LICENSE`, server codes |
@@ -296,6 +296,56 @@ type KeygateFeatureStatus = {
   resetsAt?: string;
 }
 ```
+
+---
+
+## Licensing a person rather than a machine
+
+By default an activation belongs to **this machine**: the identifier is
+derived from the operating system's machine id and the server is told
+`identifier_type: "device"`.
+
+An app that licenses people rather than machines says so:
+
+```ts
+await keygate.activate({
+  key,
+  identifier: 'person@example.com',
+  identifierType: 'user',
+});
+```
+
+The `identifier` is then required. The machine id is not a person, so the
+package refuses to use it as one and answers `NO_IDENTIFIER` rather than
+activating a device slot against a person's license.
+
+The server stores the type with the activation and shows it in the customer
+portal. It does not change how a license is counted: a `user` activation
+still takes a device slot, exactly as the vendor's own documentation
+describes.
+
+---
+
+## What a failed verify does to the cache
+
+The server answers `404 LICENSE_NOT_FOUND` for a license that does not
+exist, one that is suspended or revoked, and one where this device has no
+activation. All three mean the same thing to a client: **the license does
+not work here**.
+
+So a `verify` that fails with `LICENSE_NOT_FOUND` clears the cached token
+**and** the cached key, and the app starts unlicensed on the next launch.
+Without that, the cached token would be restored on every launch and the app
+would keep running licensed on a license the server has withdrawn, until
+the token's own check-in interval ran out.
+
+The clearing is deliberately narrow:
+
+| Situation | What happens |
+| --- | --- |
+| the cached key fails to verify | token and key are cleared |
+| a **different** key fails to verify | nothing is cleared — a customer trying a second license does not lose the one this device already has |
+| the failure is anything else | nothing is cleared — a lockout says nothing about the license |
 
 ---
 

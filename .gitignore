@@ -17,6 +17,9 @@ logs/
 coverage/
 .vitest/
 
+# Scraped page output
+.firecrawl/
+
 # Editor and OS
 .vscode/
 .idea/
