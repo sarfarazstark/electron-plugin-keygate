@@ -410,6 +410,39 @@ second license does not lose the one this device already has.
 - The cached token is honoured offline until its `exp` passes. A license
   revoked in the meantime is not known until the next online check.
 
+## Releasing
+
+The package is published as `electron-plugin-keygate` on the public npm
+registry, straight from `.github/workflows/publish.yml` — through npm's
+**trusted publishing**, so no npm token is stored in this repository. The
+workflow exchanges the job's GitHub identity for a short-lived publish token
+and writes provenance for every release.
+
+One setup step has to be done once, in npm rather than in GitHub:
+
+```
+npmjs.com -> electron-plugin-keygate -> Settings -> Trusted Publisher
+  Organization or user : sarfarazstark
+  Repository           : electron-plugin-keygate
+  Workflow filename    : publish.yml
+  Environment          : (leave empty)
+```
+
+The first version cannot go through that path, because npm only lets a package
+be configured after it exists; publish it by hand once, then configure the
+trusted publisher.
+
+After that, a release is:
+
+```sh
+npm version 0.2.0        # commits the bump and tags it
+git push --follow-tags
+```
+
+Publishing a GitHub release for that tag runs the workflow. The workflow
+installs from the lockfile, type-checks, runs the tests and publishes — so a
+release cannot ship a version whose tests do not pass.
+
 ## Licence
 
 MIT.
