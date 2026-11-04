@@ -153,6 +153,23 @@ describe('activation and verification', () => {
 		expect(entitlements.features.premium_support?.enabled).toBe(true);
 		expect(entitlements.features.api_calls?.value).toBe('50000');
 	});
+
+	it('refuses a token issued for another device', async () => {
+		const server = createMockServer();
+		const { service } = buildService(server);
+
+		// The server answers with a token bound to a different device —
+		// as a compromised or misconfigured server might.
+		server.set({ tokenIdentifier: 'kg-someone-else' });
+
+		await expect(
+			service.activate({ key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY' }),
+		).rejects.toMatchObject({ code: 'BAD_TOKEN' });
+
+		// Nothing was persisted: a refused token must not leave a
+		// licence behind.
+		expect(service.getLicense()).toBeNull();
+	});
 });
 
 describe('storage policy', () => {

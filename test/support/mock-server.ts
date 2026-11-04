@@ -21,6 +21,14 @@ export interface MockServerOptions {
 	planId?: string;
 	/** The identifier the server has an activation for. */
 	activatedIdentifier?: string;
+	/**
+	 * The identifier the token is bound to.
+	 *
+	 * Defaults to the identifier in the request. Setting it to something
+	 * else produces a token the server signed but bound to a different
+	 * device — the case the client's device-binding check exists for.
+	 */
+	tokenIdentifier?: string;
 	/** How long a token stays usable offline, in seconds. */
 	tokenTtlSeconds?: number;
 	/** When the license itself lapses, unix seconds. Zero means perpetual. */
@@ -87,7 +95,7 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 			| 'graceDays'
 			| 'status'
 		>
-	> & { features: Record<string, unknown> };
+	> & { features: Record<string, unknown>; tokenIdentifier: string | undefined };
 
 	const reset = (): void => {
 		state = {
@@ -95,6 +103,7 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 			productId: options.productId ?? 'product-under-test',
 			planId: options.planId ?? 'plan-under-test',
 			activatedIdentifier: options.activatedIdentifier ?? 'kg-testdevice',
+			tokenIdentifier: options.tokenIdentifier,
 			tokenTtlSeconds: options.tokenTtlSeconds ?? 7 * 24 * 60 * 60,
 			validUntil: options.validUntil ?? 0,
 			graceDays: options.graceDays ?? 0,
@@ -164,7 +173,7 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 				body: ok({
 					status: 'activated',
 					license_id: 'license-under-test',
-					token: issueToken(identifier, now),
+					token: issueToken(state.tokenIdentifier || identifier, now),
 					meta: { server: 'Keygate', url: 'https://keygate.app' },
 				}),
 			};
@@ -256,6 +265,9 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 			if (next.planId !== undefined) state.planId = next.planId;
 			if (next.activatedIdentifier !== undefined) {
 				state.activatedIdentifier = next.activatedIdentifier;
+			}
+			if (next.tokenIdentifier !== undefined) {
+				state.tokenIdentifier = next.tokenIdentifier;
 			}
 			if (next.tokenTtlSeconds !== undefined) state.tokenTtlSeconds = next.tokenTtlSeconds;
 			if (next.validUntil !== undefined) state.validUntil = next.validUntil;

@@ -139,10 +139,14 @@ export class LicensingService {
 			return;
 		}
 
-		const publicKey = await this.resolvePublicKey();
+		// The cached key, or a pinned one. The server is deliberately
+		// not consulted here: startup must not need the network.
+		const publicKey = await this.resolvePublicKey({ allowFetch: false });
 		if (!publicKey) {
 			this.startup = { reason: 'no-public-key' };
-			this.log.warn('no public key is available; the cached license cannot be verified');
+			this.log.warn(
+				'no public key is available; the cached license cannot be verified until the server has been reached once',
+			);
 			return;
 		}
 
@@ -177,17 +181,34 @@ export class LicensingService {
 	/**
 	 * The public key to verify tokens with.
 	 *
-	 * A pinned key always wins. Without one, the key is fetched from the
-	 * server and cached on disk — the server's own documented pattern —
-	 * so an offline machine can still verify the token it already holds.
+	 * A pinned key always wins. Without one, the key is cached on disk
+	 * the first time it is fetched, so an offline machine can still
+	 * verify the token it already holds — which is the whole point of
+	 * the offline path.
+	 *
+	 * The order is: pinned, then the cached copy, then the server. The
+	 * server is asked last so a machine that is offline never waits on
+	 * a request that cannot succeed.
 	 */
-	private async resolvePublicKey(): Promise<string | null> {
+	private async resolvePublicKey(options: { allowFetch?: boolean } = {}): Promise<string | null> {
 		if (this.config.publicKey) {
 			return this.config.publicKey;
 		}
 		if (this.publicKey) {
 			return this.publicKey;
 		}
+
+		// The cached copy first: it is what an offline launch uses.
+		const cached = await this.storage.readPublicKey();
+		if (cached && /^[0-9a-f]{64}$/.test(cached)) {
+			this.publicKey = cached;
+			return cached;
+		}
+
+		if (options.allowFetch === false) {
+			return null;
+		}
+
 		try {
 			const data = await this.client.fetchPublicKey();
 			const key = data.public_key.trim().toLowerCase();
@@ -198,6 +219,14 @@ export class LicensingService {
 				});
 			}
 			this.publicKey = key;
+			// Cache it, so the next launch works offline. A failure to
+			// cache must not fail the operation that succeeded.
+			try {
+				await this.storage.writePublicKey(key);
+			} catch (err) {
+				const detail = err instanceof KeygateError ? err.detail : 'the key could not be cached';
+				this.log.warn(`the public key could not be cached: ${detail}`);
+			}
 			return key;
 		} catch (err) {
 			const detail = err instanceof KeygateError ? err.detail : 'the public key could not be fetched';
@@ -255,6 +284,7 @@ export class LicensingService {
 
 		const publicKey = await this.requirePublicKey();
 		const payload = verifyToken(data.token, publicKey);
+		this.assertTokenBinding(payload, identifier);
 		const license = this.buildLicense(options.key, payload, false);
 
 		await this.persist(options.key, data.token, payload, license);
@@ -288,6 +318,7 @@ export class LicensingService {
 
 		const publicKey = await this.requirePublicKey();
 		const payload = verifyToken(data.token, publicKey);
+		this.assertTokenBinding(payload, identifier);
 		const license = this.buildLicense(key, payload, false, {
 			planName: data.plan_name,
 			meta: {
@@ -423,6 +454,27 @@ export class LicensingService {
 			});
 		}
 		return key;
+	}
+
+	/**
+	 * Refuse a token that was not issued for this device.
+	 *
+	 * The signature proves the server issued the token. The binding
+	 * proves it issued it *for this device*: the server writes the
+	 * identifier it was asked about into the token and hashes it with
+	 * the product id.
+	 *
+	 * Without this check, a token copied from another machine — or
+	 * replayed from another product — would verify perfectly well and
+	 * would leave this machine looking licensed.
+	 */
+	private assertTokenBinding(payload: KeygateTokenPayload, identifier: string): void {
+		if (!tokenBindingMatches(payload, identifier)) {
+			throw new KeygateError({
+				code: 'BAD_TOKEN',
+				detail: 'the token was issued for a different device or product',
+			});
+		}
 	}
 
 	/** Write the license key and the token to the cache. */
