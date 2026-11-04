@@ -7,7 +7,7 @@
 	"author": "Sarfaraz Stark",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/sarfarazstark/electron-plugin-keygate.git"
+		"url": "https://github.com/sarfarazstark/electron-plugin-keygate.git"
 	},
 	"homepage": "https://github.com/sarfarazstark/electron-plugin-keygate#readme",
 	"bugs": {
@@ -72,5 +72,9 @@
 	},
 	"engines": {
 		"node": ">= 20"
+	},
+	"allowScripts": {
+		"electron": true,
+		"esbuild": true
 	}
 }
