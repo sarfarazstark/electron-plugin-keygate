@@ -27,7 +27,12 @@ export type Invoke = (channel: string, ...args: unknown[]) => Promise<unknown>;
 export interface KeygateBridge {
 	getLicense(): Promise<IpcResult<KeygateLicense | null>>;
 	getLicenseKey(): Promise<IpcResult<string | null>>;
-	activate(options: { key: string; label?: string; identifier?: string }): Promise<IpcResult<KeygateLicense>>;
+	activate(options: {
+		key: string;
+		label?: string;
+		identifier?: string;
+		identifierType?: 'device' | 'user';
+	}): Promise<IpcResult<KeygateLicense>>;
 	verify(options?: { key?: string; identifier?: string }): Promise<IpcResult<KeygateLicense>>;
 	deactivate(options?: { key?: string; identifier?: string }): Promise<IpcResult<null>>;
 	getEntitlements(options?: { key?: string; feature?: string }): Promise<IpcResult<KeygateEntitlements>>;

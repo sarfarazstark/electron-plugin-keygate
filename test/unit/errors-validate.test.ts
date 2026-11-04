@@ -93,6 +93,14 @@ describe('argument validation', () => {
 		expect(validateActivateArgs([[]]).ok).toBe(false);
 	});
 
+	it('accepts only device or user as an identifier type', () => {
+		expect(validateActivateArgs([{ key: 'KG-ABC', identifierType: 'device' }]).ok).toBe(true);
+		expect(validateActivateArgs([{ key: 'KG-ABC', identifierType: 'user' }]).ok).toBe(true);
+		// The server answers 400 for anything else, so it is caught here.
+		expect(validateActivateArgs([{ key: 'KG-ABC', identifierType: 'machine' }]).ok).toBe(false);
+		expect(validateActivateArgs([{ key: 'KG-ABC', identifierType: 42 }]).ok).toBe(false);
+	});
+
 	it('rejects the wrong number of arguments', () => {
 		expect(validateActivateArgs([]).ok).toBe(false);
 		expect(validateActivateArgs([{ key: 'a' }, { key: 'b' }]).ok).toBe(false);

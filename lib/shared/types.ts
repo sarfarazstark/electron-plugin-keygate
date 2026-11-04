@@ -114,6 +114,19 @@ export interface ActivateOptions {
 	label?: string;
 	/** Override the device identifier. Defaults to this machine's. */
 	identifier?: string;
+	/**
+	 * What the identifier names.
+	 *
+	 * `device` is the default and is what this machine's identifier is.
+	 * `user` is for licensing a person rather than a machine — the
+	 * identifier is then that person's, usually their email address,
+	 * and the `identifier` option must be given: this package will not
+	 * invent one, because the machine id is not a person.
+	 *
+	 * The server stores this with the activation and shows it in the
+	 * customer portal. It does not change how a license is counted.
+	 */
+	identifierType?: 'device' | 'user';
 }
 
 /** Options for `keygate:verify`. */

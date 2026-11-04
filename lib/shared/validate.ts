@@ -105,11 +105,12 @@ export function validateNoArgs(args: unknown[]): Validated<undefined> {
 	return fail('this channel takes no arguments');
 }
 
-/** `keygate:activate` — `{ key, label?, identifier? }`. */
+/** `keygate:activate` — `{ key, label?, identifier?, identifierType? }`. */
 export function validateActivateArgs(args: unknown[]): Validated<{
 	key: string;
 	label?: string;
 	identifier?: string;
+	identifierType?: 'device' | 'user';
 }> {
 	if (!Array.isArray(args) || args.length !== 1) {
 		return fail('expected exactly one argument object');
@@ -130,12 +131,30 @@ export function validateActivateArgs(args: unknown[]): Validated<{
 	if (!identifier.ok) {
 		return fail(identifier.detail);
 	}
-	const result: { key: string; label?: string; identifier?: string } = { key: key.value };
+	// The server accepts only these two, and answers 400 for anything
+	// else, so it is checked here first.
+	const identifierType = source['identifierType'];
+	if (
+		identifierType !== undefined &&
+		identifierType !== 'device' &&
+		identifierType !== 'user'
+	) {
+		return fail('identifierType must be device or user');
+	}
+	const result: {
+		key: string;
+		label?: string;
+		identifier?: string;
+		identifierType?: 'device' | 'user';
+	} = { key: key.value };
 	if (label.value !== undefined) {
 		result.label = label.value;
 	}
 	if (identifier.value !== undefined) {
 		result.identifier = identifier.value;
+	}
+	if (identifierType !== undefined) {
+		result.identifierType = identifierType;
 	}
 	return ok(result);
 }

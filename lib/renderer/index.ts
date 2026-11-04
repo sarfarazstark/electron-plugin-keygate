@@ -26,7 +26,12 @@ export interface KeygateLicensingAPI {
 	/** The cached license key, or `null`. */
 	getLicenseKey(): Promise<string | null>;
 	/** Activate a license on this device. */
-	activate(options: { key: string; label?: string; identifier?: string }): Promise<KeygateLicense>;
+	activate(options: {
+		key: string;
+		label?: string;
+		identifier?: string;
+		identifierType?: 'device' | 'user';
+	}): Promise<KeygateLicense>;
 	/** Verify a license against the server. */
 	verify(options?: { key?: string; identifier?: string }): Promise<KeygateLicense>;
 	/** Release this device's activation slot. */

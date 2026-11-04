@@ -292,11 +292,12 @@ export class KeygateClient {
 		key: string;
 		identifier: string;
 		label?: string;
+		identifierType?: 'device' | 'user';
 	}): Promise<KeygateActivateData> {
 		const body: Record<string, unknown> = {
 			license_key: input.key,
 			identifier: input.identifier,
-			identifier_type: 'device',
+			identifier_type: input.identifierType ?? 'device',
 		};
 		if (input.label !== undefined && input.label.length > 0) {
 			body.label = input.label;
