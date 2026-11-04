@@ -244,6 +244,11 @@ Keychain on macOS, libsecret or kwallet on Linux. **There is no plaintext
 fallback.** Linux's `basic_text` backend counts as unusable, because the
 "key" is a fixed string in a world-readable file.
 
+The package speaks both generations of the `safeStorage` API, so it works on
+Electron 30 through 46 and beyond: the synchronous trio on 30–45, the
+asynchronous trio on 45+. Electron 46 removed the synchronous one, so the
+asynchronous API is preferred whenever it is present.
+
 ## Deliberately absent
 
 - No arbitrary-invoke channel, no filesystem channel, and no channel that

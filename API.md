@@ -388,6 +388,29 @@ userData/keygate/pubkey  the verification public key — safeStorage ciphertext
 | `safeStorage`'s async API is used when present, the sync one otherwise | `storage.ts` |
 | the methods are always bound to the `safeStorage` object | `storage.ts` |
 
+### `safeStorage` across Electron versions
+
+Electron 45 added `isAsyncEncryptionAvailable`, `encryptStringAsync` and
+`decryptStringAsync`; Electron 46 removed the synchronous trio. The package
+speaks both, so it works on every supported version:
+
+| Electron | API used | Note |
+| --- | --- | --- |
+| 30–44 | `isEncryptionAvailable` / `encryptString` / `decryptString` | |
+| 45 | async trio, falling back to sync | both are present |
+| 46+ | async trio | the sync trio is gone, so the async one is the only option |
+
+Two details of the async API are easy to get wrong, and both are covered by
+`test/unit/storage.ts`:
+
+- `decryptStringAsync` resolves with an **object** — `{ result, shouldReEncrypt }` —
+  not with a string. Reading it as a string makes every cached license
+  unreadable, which shows up as "the app forgot my license" rather than as an
+  error. A plain string is accepted too, because a wrapper may resolve with one.
+- `shouldReEncrypt` means the OS vault has rotated its key. The value is
+  rewritten with the new key after a successful read, so the rotation costs
+  one write and the value survives it.
+
 The public key is cached because it is public information, and because an
 offline machine needs it: the token in the cache is verified against it
 without a network call. The resolution order is the pinned key, then the

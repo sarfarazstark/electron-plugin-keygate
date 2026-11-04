@@ -86,6 +86,44 @@ pretending.
 **Not verified here:** the `basic_text` branch itself was exercised
 through an injected `safeStorage` double, not on a real Linux box.
 
+## Electron 46 removed the synchronous `safeStorage` API
+
+Electron 45 added `isAsyncEncryptionAvailable`, `encryptStringAsync` and
+`decryptStringAsync`. Electron 46 **removed** `isEncryptionAvailable`,
+`encryptString` and `decryptString`.
+
+A package that claims `electron >= 30` but only speaks the synchronous API
+works on 30–45 and breaks on 46: the probe throws, the availability check
+answers "no vault", and every activation fails with `STORAGE_UNAVAILABLE` —
+which reads like a broken keychain rather than a removed method.
+
+The package now speaks both. The asynchronous API is preferred whenever it is
+present, because it is the one that survives.
+
+The trap is the **shape** of the answer. `decryptStringAsync` resolves with an
+object — `{ result, shouldReEncrypt }` — not with a string:
+
+```ts
+// Wrong. `plaintext` becomes "[object Object]".
+const { result } = await safeStorage.decryptStringAsync(buffer);
+
+// Right.
+const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(buffer);
+```
+
+Read as a string, the cached license fails to parse and the cache is
+silently discarded. The app then starts unlicensed with no error anywhere —
+the offline restore simply stops working, and only on the machines where the
+customer most needs it.
+
+Both shapes are accepted, because a wrapper may resolve with a plain string,
+and both are covered by `test/unit/storage.ts`.
+
+**Verified here:** through `safeStorage` doubles that reproduce both
+generations, including the object-shaped decrypt and the `shouldReEncrypt`
+rotation. The Windows DPAPI path was exercised against a real vault, in a
+packaged application.
+
 ## The device identifier is derived, not proven
 
 The identifier comes from the operating system's machine id —
@@ -163,7 +201,12 @@ token.
   re-read per request, argument validation, and the envelope.
 - The storage policy: no plaintext on disk, the vault probed before the
   network call, `basic_text` refused.
-- Offline restoration across a simulated restart, with the network gone.
+- Both generations of the `safeStorage` API: the synchronous trio, the
+  asynchronous trio, the object-shaped `decryptStringAsync`, the
+  `shouldReEncrypt` rotation, and the async API being preferred when both
+  are present.
+- Offline restoration across a simulated restart, with the network gone —
+  on the asynchronous vault, which is the one Electron 46 keeps.
 
 **Verified in a live Electron renderer:**
 
@@ -183,6 +226,9 @@ token.
 
 - macOS Keychain and Linux libsecret. The `safeStorage` behaviour was
   exercised through doubles, not on those platforms.
+- Electron 46 itself. The synchronous/async split was reproduced through
+  doubles; the installed Electron was 40, which still has the synchronous
+  API.
 - A packaged installer (NSIS, MSI). The application was packaged
   unpacked, with `electron-builder --dir`; the asar layout is the same
   either way, but the installer's own behaviour was not exercised.
