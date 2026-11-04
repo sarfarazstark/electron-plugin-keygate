@@ -1,0 +1,17 @@
+# Normalise line endings to LF in the repository, and check them out as LF.
+# Windows checkouts get LF too, so a file's bytes do not change with the
+# machine it was edited on.
+* text=auto eol=lf
+
+*.ts text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+LICENSE text eol=lf
+
+# Binary assets, if any are added later.
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary

@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": ["ES2023", "DOM"],
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"types": ["node"],
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"noFallthroughCasesInSwitch": true,
+		"forceConsistentCasingInFileNames": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"skipLibCheck": true,
+		"resolveJsonModule": true,
+		"allowImportingTsExtensions": true,
+		"rewriteRelativeImportExtensions": true,
+		"declaration": true,
+		"sourceMap": true,
+		"noEmit": true
+	},
+	"include": ["lib", "test", "scripts", "examples"]
+}

@@ -1,0 +1,64 @@
+{
+	"name": "electron-plugin-keygate",
+	"version": "0.1.0",
+	"description": "Electron licensing plugin for Keygate — activation, verification, offline signed tokens and entitlements, with a sandbox-first preload bridge.",
+	"keywords": ["electron", "keygate", "licensing", "activation", "offline", "ed25519"],
+	"license": "MIT",
+	"author": "Sarfaraz Stark",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/sarfarazstark/electron-plugin-keygate.git"
+	},
+	"type": "module",
+	"main": "./dist/main/index.js",
+	"types": "./dist/main/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/main/index.d.ts",
+			"import": "./dist/main/index.js"
+		},
+		"./renderer": {
+			"types": "./dist/renderer/index.d.ts",
+			"import": "./dist/renderer/index.js"
+		},
+		"./preload": {
+			"types": "./dist/preload/index.d.ts",
+			"import": "./dist/preload/index.mjs"
+		},
+		"./preload/sandboxed": {
+			"types": "./dist/preload/sandboxed.d.ts",
+			"import": "./dist/preload/sandboxed.cjs"
+		},
+		"./preload/api": {
+			"types": "./dist/preload/api.d.ts",
+			"import": "./dist/preload/api.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": ["dist", "README.md", "API.md", "BUGS.md", "LICENSE"],
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run",
+		"test:unit": "vitest run test/unit",
+		"test:integration": "vitest run test/integration",
+		"test:offline": "vitest run test/offline",
+		"test:live": "vitest run test/live --run",
+		"verify:electron": "node scripts/verify-electron.mjs",
+		"verify:live": "node scripts/verify-live.mjs",
+		"prepublishOnly": "npm run build"
+	},
+	"peerDependencies": {
+		"electron": ">= 30"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"electron": "^40.0.0",
+		"esbuild": "^0.25.0",
+		"typescript": "^5.9.0",
+		"vitest": "^3.2.0"
+	},
+	"engines": {
+		"node": ">= 20"
+	}
+}
