@@ -82,6 +82,14 @@ try {
 					'electron-builder': '^26.0.0',
 					esbuild: '^0.25.0',
 				},
+				// npm refuses to run install scripts unless they are
+				// approved. These three download a binary or a platform
+				// package; they are the normal Electron toolchain.
+				allowScripts: {
+					electron: true,
+					esbuild: true,
+					'electron-winstaller': true,
+				},
 			},
 			null,
 			2,
