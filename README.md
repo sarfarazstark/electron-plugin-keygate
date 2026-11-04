@@ -15,6 +15,22 @@ if (license.entitlements.includes('premium_support')) {
 }
 ```
 
+## This is a Keygate client, not a Keygen one
+
+The protocol here is **Keygate's** — the endpoints `/license/activate`,
+`/license/verify`, `/license/deactivate`, `/license/entitlements` and
+`/license/pubkey`, and the signed-token scheme described below.
+
+Keygen's plugin was read as an *architectural* reference only — for the
+preload layout, the IPC trust model and the shape of the offline cache.
+Keygen's **wire protocol is different and is not implemented here**: it uses
+`/v1/licenses/…` paths and a server-controlled *machine file* for offline
+validity, where Keygate issues a signed token that carries its own lifetime.
+
+So this package is not a drop-in replacement for a Keygen client, and a
+Keygen-shaped detail appearing in the code is a bug rather than a
+compatibility feature.
+
 ## Install
 
 ```sh
@@ -167,6 +183,12 @@ The client verifies the signature locally with the server's public key, so
 **a licence can be restored on launch with no network at all**. The server
 clamps `exp` so it never outlives `vun` plus the grace days, and the
 client honours both.
+
+The token is `base64url(payload-json) + "." + base64url(ed25519-signature)`,
+and **the signed bytes are the base64url payload string, not the JSON**.
+Signing or verifying the JSON instead is the most common integration mistake
+here: it produces a token that looks well-formed and is rejected by the
+server.
 
 The consequence worth knowing: a license revoked on the server is still
 honoured offline until the cached token's `exp` passes. Shorten the

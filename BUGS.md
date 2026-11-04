@@ -147,7 +147,9 @@ Activating on a new machine without deactivating on the old one leaves
 the old slot occupied, and the plan's device limit counts both.
 
 The Keygen plugin this package is modelled on had the same property, and
-it is a property of the licensing model rather than of the client.
+it is a property of the licensing model rather than of the client. (Keygen
+was an architectural reference only — its wire protocol is not implemented
+here.)
 
 ## Rate limits and lockouts are the server's
 

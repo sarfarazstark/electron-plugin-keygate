@@ -3,10 +3,11 @@
  *
  * This is the only object that talks to the Keygate server, and the only
  * one that touches the local cache. The renderer never sees any of it:
- * the renderer sees the six IPC channels and nothing else.
+ * the renderer sees the eight IPC channels and nothing else.
  *
  * The offline story, which is where Keygate differs from the Keygen
- * plugin this package is modelled on:
+ * plugin this package was modelled on. Keygen was an architectural
+ * reference only — its wire protocol is not implemented here:
  *
  *   Keygen checked a **machine file** out of the server — a separate,
  *   encrypted blob whose TTL the server controlled. Offline validity
