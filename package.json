@@ -46,6 +46,8 @@
 		"test:live": "vitest run test/live --run",
 		"verify:electron": "node scripts/verify-electron.mjs",
 		"verify:live": "node scripts/verify-live.mjs",
+		"verify:packaged": "npm run build && node scripts/verify-packaged.mjs",
+		"smoke": "node scripts/smoke.mjs",
 		"prepublishOnly": "npm run build"
 	},
 	"peerDependencies": {

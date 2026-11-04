@@ -1,0 +1,20 @@
+{
+	"name": "keygate-packaged-example",
+	"version": "1.0.0",
+	"description": "A minimal Electron app that consumes electron-plugin-keygate, used to test the packaged layout.",
+	"private": true,
+	"main": "./out/main/main.js",
+	"scripts": {
+		"build": "node build.mjs",
+		"package": "npm run build && electron-builder --dir --win",
+		"start": "electron ."
+	},
+	"dependencies": {
+		"electron-plugin-keygate": "file:../../electron-plugin-keygate-0.1.0.tgz"
+	},
+	"devDependencies": {
+		"electron": "^40.0.0",
+		"electron-builder": "^26.0.0",
+		"esbuild": "^0.25.0"
+	}
+}

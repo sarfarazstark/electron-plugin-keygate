@@ -6,6 +6,7 @@
  * service so the app can read the startup diagnostic.
  */
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { KeygateError } from '../shared/errors.ts';
@@ -13,7 +14,7 @@ import { KeygateClient } from './client.ts';
 import type { FetchLike } from './client.ts';
 import { configFromEnv, KeygateBuilder, resolveConfig } from './config.ts';
 import type { KeygateConfig, KeygateConfigInput } from './config.ts';
-import { registerKeygateIpc } from './ipc.ts';
+import { makeWindowTrustChecker, registerKeygateIpc } from './ipc.ts';
 import type { IpcMainLike } from './ipc.ts';
 import { createDefaultLogger } from './logger.ts';
 import type { Logger } from './logger.ts';
@@ -214,27 +215,55 @@ export function keygateSandboxedPreloadPath(): string {
 /**
  * Resolve a file inside this package.
  *
- * The package `exports` map is consulted first, so the path is right
- * whether the package was installed normally or linked. The `dist/`
- * fallback covers a source checkout with no install step.
+ * The package directory is found with **Node's own resolution** first:
+ * `require.resolve('electron-plugin-keygate/package.json')` walks the
+ * `node_modules` chain from the calling file and finds wherever the
+ * package actually sits.
+ *
+ * That matters because the calling file is often not this one. An app
+ * that bundles its main script -- with esbuild, with Vite, with
+ * webpack -- inlines this package's code, and then `import.meta.url`
+ * points at the *app's* bundle rather than at the package. Resolving
+ * relative to it produced a path inside the app's own directory, and
+ * the preload was not there.
+ *
+ * The `exports` map of the package that was found decides the file
+ * name, so the path is right whether the package was installed, linked
+ * or vendored. The layout fallback covers a source checkout with no
+ * install step.
  */
 function resolvePreload(subpath: string, fileName: string): string {
-	const here = dirname(fileURLToPath(import.meta.url));
-	const packageRoot = resolve(here, '..', '..');
+	const candidates: string[] = [];
 
+	// 1. The installed package, wherever it is.
 	try {
 		const require = createRequire(import.meta.url);
-		const manifest = require(join(packageRoot, 'package.json')) as {
+		const manifestPath = require.resolve('electron-plugin-keygate/package.json');
+		const packageRoot = dirname(manifestPath);
+		const manifest = require(manifestPath) as {
 			exports?: Record<string, { import?: string } | string>;
 		};
 		const entry = manifest.exports?.[subpath];
 		const target = typeof entry === 'string' ? entry : entry?.import;
 		if (target) {
-			return join(packageRoot, target);
+			candidates.push(join(packageRoot, target));
 		}
+		candidates.push(join(packageRoot, 'dist', subpath, fileName));
 	} catch {
-		// Fall through to the layout-based fallback.
+		// Not installed as a dependency, or the manifest is unreadable.
 	}
 
-	return join(packageRoot, 'dist', subpath, fileName);
+	// 2. This package's own layout, for a source checkout.
+	const here = dirname(fileURLToPath(import.meta.url));
+	candidates.push(resolve(here, '..', '..', 'dist', subpath, fileName));
+
+	for (const candidate of candidates) {
+		if (existsSync(candidate)) {
+			return candidate;
+		}
+	}
+
+	// Nothing exists. Return the first candidate so the caller gets a
+	// path it can report, rather than a silent failure.
+	return candidates[0] ?? resolve(here, '..', '..', 'dist', subpath, fileName);
 }

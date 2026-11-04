@@ -170,12 +170,22 @@ token.
 - The sandboxed preload installs `window.keygate` under `sandbox: true`,
   all eight channels are present, and the channels answer.
 
+**Verified in a packaged Windows application:**
+
+- The package installed from a tarball, inside an `app.asar`, with the
+  preload loaded from inside the archive: the bridge is installed and all
+  eight channels answer.
+- The installed package carries only the built output. The `files`
+  field decides what ships, and the test asserts the source tree does
+  not.
+
 **Not verified here:**
 
 - macOS Keychain and Linux libsecret. The `safeStorage` behaviour was
   exercised through doubles, not on those platforms.
-- A packaged asar layout. The build and the preload paths were checked
-  in a development tree.
+- A packaged installer (NSIS, MSI). The application was packaged
+  unpacked, with `electron-builder --dir`; the asar layout is the same
+  either way, but the installer's own behaviour was not exercised.
 - The real Keygate server end to end. The protocol was reproduced
   faithfully against the server's own source — the envelope, the
   endpoints, the token format and the fingerprint definition — and the
