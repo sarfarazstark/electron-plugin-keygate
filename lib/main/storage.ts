@@ -268,9 +268,42 @@ export class KeygateStorage {
 		await this.remove('token');
 	}
 
+	/**
+	 * The cached verification public key, or `null`.
+	 *
+	 * This is what makes an offline restore possible. The key is public
+	 * information — it is cached so a machine that cannot reach the
+	 * server can still verify the token it already holds.
+	 */
+	async readPublicKey(): Promise<string | null> {
+		const value = await this.readEncrypted('pubkey');
+		if (value === null) {
+			return null;
+		}
+		try {
+			const parsed = JSON.parse(value) as { publicKey?: unknown };
+			return typeof parsed.publicKey === 'string' && parsed.publicKey.length > 0
+				? parsed.publicKey
+				: null;
+		} catch {
+			return null;
+		}
+	}
+
+	/** Cache the verification public key. */
+	async writePublicKey(publicKey: string): Promise<void> {
+		await this.writeEncrypted('pubkey', JSON.stringify({ publicKey }));
+	}
+
+	/** Forget the cached public key. */
+	async clearPublicKey(): Promise<void> {
+		await this.remove('pubkey');
+	}
+
 	/** Forget everything. */
 	async clearAll(): Promise<void> {
 		await this.clearToken();
 		await this.clearLicenseKey();
+		await this.clearPublicKey();
 	}
 }

@@ -96,6 +96,12 @@ export function validateNoArgs(args: unknown[]): Validated<undefined> {
 	if (!Array.isArray(args) || args.length === 0) {
 		return ok(undefined);
 	}
+	// Electron hands over an empty array when the channel is invoked with
+	// no arguments, but a caller that passes one `undefined` means the
+	// same thing.
+	if (args.length === 1 && args[0] === undefined) {
+		return ok(undefined);
+	}
 	return fail('this channel takes no arguments');
 }
 

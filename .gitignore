@@ -5,6 +5,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Packed tarballs
+*.tgz
+
 # Logs
 *.log
 npm-debug.log*

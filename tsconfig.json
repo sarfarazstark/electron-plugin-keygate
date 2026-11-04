@@ -16,6 +16,14 @@
 		"resolveJsonModule": true,
 		"allowImportingTsExtensions": true,
 		"rewriteRelativeImportExtensions": true,
+		"baseUrl": ".",
+		"paths": {
+			"electron-plugin-keygate": ["./lib/main/index.ts"],
+			"electron-plugin-keygate/renderer": ["./lib/renderer/index.ts"],
+			"electron-plugin-keygate/preload": ["./lib/preload/index.ts"],
+			"electron-plugin-keygate/preload/sandboxed": ["./lib/preload/sandboxed.ts"],
+			"electron-plugin-keygate/preload/api": ["./lib/preload/api.ts"]
+		},
 		"declaration": true,
 		"sourceMap": true,
 		"noEmit": true
