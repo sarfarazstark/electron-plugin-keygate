@@ -74,6 +74,10 @@ export class LicensingService {
 	private startup: StartupDiagnostic = { reason: 'no-cache' };
 	/** The public key in use — pinned, or fetched and cached. */
 	private publicKey: string | null = null;
+	/** Whether the OS vault can hold licensing secrets. */
+	private vaultUsable = false;
+	/** Whether the vault has been probed yet. */
+	private vaultProbed = false;
 
 	constructor(args: ServiceInitArgs) {
 		this.config = args.config;
@@ -89,9 +93,21 @@ export class LicensingService {
 	 *
 	 * Check this in the main process: a valid license that cannot be
 	 * stored is a license that does not survive a restart.
+	 *
+	 * The answer is the one probed last — during `init()`, and again
+	 * before each network call — because the vault's availability can
+	 * change while the app is running.
+	 *
+	 * The property is synchronous and the probe is not, so it cannot
+	 * probe on demand: `encryptionAvailable()` is async on Electron 45+
+	 * and awaiting it here would need a different type. Every path
+	 * through the package probes before it answers — `registerKeygate`
+	 * awaits `init()` before it returns — but a caller that reads this
+	 * before any probe has run is answered `false` rather than being
+	 * told a license will be stored when nothing has checked yet.
 	 */
 	get persistsLicenses(): boolean {
-		return this.storage.isAvailable();
+		return this.vaultProbed && this.vaultUsable;
 	}
 
 	/**
@@ -124,7 +140,9 @@ export class LicensingService {
 	 * on launch still starts licensed.
 	 */
 	async init(): Promise<void> {
-		if (!this.storage.isAvailable()) {
+		this.vaultUsable = await this.storage.encryptionAvailable();
+		this.vaultProbed = true;
+		if (!this.vaultUsable) {
 			this.startup = {
 				reason: 'storage-unavailable',
 				detail: 'the operating system encryption vault is unusable',
@@ -274,7 +292,7 @@ export class LicensingService {
 		// Probe the vault before the network call: a successful
 		// activation that cannot be stored would look like a license the
 		// app has and cannot keep.
-		this.assertStorageUsable();
+		await this.assertStorageUsable();
 
 		const data = await this.client.activate({
 			key: options.key,
@@ -312,7 +330,7 @@ export class LicensingService {
 		}
 		const identifier = await this.resolveIdentifier(options.identifier);
 
-		this.assertStorageUsable();
+		await this.assertStorageUsable();
 
 		const data = await this.client.verify({ key, identifier });
 
@@ -434,9 +452,17 @@ export class LicensingService {
 		return this.config.publicKey ?? this.publicKey;
 	}
 
-	/** Fail when the vault cannot be used. */
-	private assertStorageUsable(): void {
-		if (!this.storage.isAvailable()) {
+	/**
+	 * Probe the vault and fail when it cannot be used.
+	 *
+	 * The probe happens *before* the network call: a successful
+	 * activation that cannot be stored would look like a licence the app
+	 * has and cannot keep.
+	 */
+	private async assertStorageUsable(): Promise<void> {
+		this.vaultUsable = await this.storage.encryptionAvailable();
+		this.vaultProbed = true;
+		if (!this.vaultUsable) {
 			throw new KeygateError({
 				code: 'STORAGE_UNAVAILABLE',
 				detail: 'the operating system encryption vault is not available',
