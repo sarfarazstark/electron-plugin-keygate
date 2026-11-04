@@ -27,72 +27,115 @@ import type { KeygateLicense, KeygateTokenPayload } from '../shared/types.ts';
  *
  * Declared structurally so the storage layer can be tested without
  * Electron, and so the async and sync variants are both usable.
+ *
+ * The async trio arrived in Electron 45 and the sync pair was removed
+ * in Electron 46, so a package that claims to support `electron >= 30`
+ * has to speak both.
  */
 export interface SafeStorageLike {
+	/** Electron 30–45. */
 	isEncryptionAvailable?(): boolean;
 	encryptString?(plainText: string): Buffer;
 	decryptString?(encrypted: Buffer): string;
+	/** Electron 45+. */
+	isAsyncEncryptionAvailable?(): Promise<boolean>;
 	encryptStringAsync?(plainText: string): Promise<Buffer>;
-	decryptStringAsync?(encrypted: Buffer): Promise<string>;
+	/**
+	 * Electron 45+ resolves with an **object**, not a string:
+	 * `{ result, shouldReEncrypt }`.
+	 *
+	 * The plain string is accepted as well, because a shim or an older
+	 * Electron may return that, and reading the wrong shape would
+	 * silently turn every cached license into a parse failure.
+	 */
+	decryptStringAsync?(
+		encrypted: Buffer,
+	): Promise<{ result: string; shouldReEncrypt?: boolean } | string>;
+	/** Linux only: the selected secret store, or `basic_text` for none. */
 	getSelectedStorageBackend?(): string;
+}
+
+/** The result of a decrypt. */
+export interface DecryptedSecret {
+	/** The plaintext. */
+	plaintext: string;
+	/**
+	 * Whether the OS vault says the value should be re-encrypted —
+	 * the key has rotated, or a better one is now available.
+	 */
+	reencrypt: boolean;
 }
 
 /** A codec that encrypts and decrypts strings. */
 export interface SecretCodec {
 	/** Whether the OS vault can be used at all. */
-	isAvailable(): boolean;
+	isAvailable(): Promise<boolean>;
 	/** Encrypt a string. Throws `STORAGE_UNAVAILABLE` when it cannot. */
 	encrypt(plainText: string): Promise<Buffer>;
 	/** Decrypt a buffer. Throws `STORAGE_DECRYPT_FAILED` when it cannot. */
-	decrypt(encrypted: Buffer): Promise<string>;
+	decrypt(encrypted: Buffer): Promise<DecryptedSecret>;
 }
 
 /**
  * Build a codec over Electron's `safeStorage`.
  *
  * The methods are bound to the object: `safeStorage` relies on `this`,
- * and a detached method throws.
+ * and a detached method throws "Illegal invocation". That failure looks
+ * identical to "no vault here" from the outside, because the
+ * availability probe swallows it — so the trio is bound once here and
+ * never destructured into free functions.
  */
 export function buildSafeStorageCodec(safeStorage: SafeStorageLike): SecretCodec {
-	const encryptSync = safeStorage.encryptString?.bind(safeStorage);
-	const decryptSync = safeStorage.decryptString?.bind(safeStorage);
+	const isAsyncAvailable = safeStorage.isAsyncEncryptionAvailable?.bind(safeStorage);
 	const encryptAsync = safeStorage.encryptStringAsync?.bind(safeStorage);
 	const decryptAsync = safeStorage.decryptStringAsync?.bind(safeStorage);
-	const isAvailable = safeStorage.isEncryptionAvailable?.bind(safeStorage);
+
+	const isSyncAvailable = safeStorage.isEncryptionAvailable?.bind(safeStorage);
+	const encryptSync = safeStorage.encryptString?.bind(safeStorage);
+	const decryptSync = safeStorage.decryptString?.bind(safeStorage);
+
 	const backend = safeStorage.getSelectedStorageBackend?.bind(safeStorage);
 
-	const usable = (): boolean => {
-		if (typeof isAvailable === 'function' && !isAvailable()) {
-			return false;
-		}
-		if (typeof encryptSync !== 'function' && typeof encryptAsync !== 'function') {
-			return false;
-		}
-		if (typeof decryptSync !== 'function' && typeof decryptAsync !== 'function') {
-			return false;
-		}
+	// The async trio is preferred: it is the one Electron 46 keeps.
+	const useAsync =
+		typeof isAsyncAvailable === 'function' &&
+		typeof encryptAsync === 'function' &&
+		typeof decryptAsync === 'function';
+
+	const usable = async (): Promise<boolean> => {
 		// `basic_text` is libsecret's fallback: the key is a fixed string
 		// in a world-readable file, so it protects nothing.
 		if (typeof backend === 'function' && backend() === 'basic_text') {
 			return false;
 		}
-		return true;
+		if (useAsync) {
+			try {
+				return await isAsyncAvailable!();
+			} catch {
+				return false;
+			}
+		}
+		if (typeof isSyncAvailable === 'function' && typeof encryptSync === 'function') {
+			try {
+				return isSyncAvailable();
+			} catch {
+				return false;
+			}
+		}
+		return false;
 	};
 
 	return {
 		isAvailable: usable,
 		async encrypt(plainText) {
-			if (!usable()) {
+			if (!(await usable())) {
 				throw new KeygateError({
 					code: 'STORAGE_UNAVAILABLE',
 					detail: 'the operating system encryption vault is not available',
 				});
 			}
 			try {
-				if (typeof encryptAsync === 'function') {
-					return await encryptAsync(plainText);
-				}
-				return encryptSync!(plainText);
+				return useAsync ? await encryptAsync!(plainText) : encryptSync!(plainText);
 			} catch (err) {
 				const detail = err instanceof Error ? err.message : 'the vault refused to encrypt';
 				throw new KeygateError({
@@ -102,17 +145,26 @@ export function buildSafeStorageCodec(safeStorage: SafeStorageLike): SecretCodec
 			}
 		},
 		async decrypt(encrypted) {
-			if (!usable()) {
+			if (!(await usable())) {
 				throw new KeygateError({
 					code: 'STORAGE_UNAVAILABLE',
 					detail: 'the operating system encryption vault is not available',
 				});
 			}
 			try {
-				if (typeof decryptAsync === 'function') {
-					return await decryptAsync(encrypted);
+				if (!useAsync) {
+					return { plaintext: decryptSync!(encrypted), reencrypt: false };
 				}
-				return decryptSync!(encrypted);
+				const result = await decryptAsync!(encrypted);
+				// Electron 45+ resolves with an object. A shim may resolve
+				// with the string itself, so both shapes are read.
+				if (typeof result === 'string') {
+					return { plaintext: result, reencrypt: false };
+				}
+				return {
+					plaintext: result.result,
+					reencrypt: result.shouldReEncrypt === true,
+				};
 			} catch (err) {
 				const detail = err instanceof Error ? err.message : 'the vault refused to decrypt';
 				throw new KeygateError({
@@ -134,6 +186,12 @@ export interface CachedToken {
 	license: KeygateLicense;
 	/** When this entry was written, unix milliseconds. */
 	storedAt: number;
+}
+
+/** A decrypted file, and whether the vault wants it written again. */
+interface ReadSecret {
+	value: string;
+	reencrypt: boolean;
 }
 
 /**
@@ -162,7 +220,7 @@ export class KeygateStorage {
 	}
 
 	/** Whether the OS vault can be used. */
-	isAvailable(): boolean {
+	async encryptionAvailable(): Promise<boolean> {
 		return this.codec.isAvailable();
 	}
 
@@ -172,7 +230,7 @@ export class KeygateStorage {
 
 	/** Write an encrypted file. */
 	private async writeEncrypted(name: string, plainText: string): Promise<void> {
-		if (!this.codec.isAvailable()) {
+		if (!(await this.codec.isAvailable())) {
 			throw new KeygateError({
 				code: 'STORAGE_UNAVAILABLE',
 				detail: 'the operating system encryption vault is not available',
@@ -183,8 +241,14 @@ export class KeygateStorage {
 		await writeFile(this.pathFor(name), ciphertext, { mode: 0o600 });
 	}
 
-	/** Read an encrypted file. Returns `null` when it is not there. */
-	private async readEncrypted(name: string): Promise<string | null> {
+	/**
+	 * Read an encrypted file. Returns `null` when it is not there.
+	 *
+	 * When the vault reports that the key has rotated, the file is
+	 * rewritten with the new key: the value stays readable, and the
+	 * next read does not have to rotate again.
+	 */
+	private async readEncrypted(name: string): Promise<ReadSecret | null> {
 		let ciphertext: Buffer;
 		try {
 			ciphertext = await readFile(this.pathFor(name));
@@ -194,7 +258,16 @@ export class KeygateStorage {
 		if (ciphertext.length === 0) {
 			return null;
 		}
-		return this.codec.decrypt(ciphertext);
+		const decrypted = await this.codec.decrypt(ciphertext);
+		if (decrypted.reencrypt) {
+			try {
+				await this.writeEncrypted(name, decrypted.plaintext);
+			} catch {
+				// The rotation is an optimisation; failing it must not
+				// lose the value that was just read.
+			}
+		}
+		return { value: decrypted.plaintext, reencrypt: decrypted.reencrypt };
 	}
 
 	/** Remove a file. A file that is not there is not an error. */
@@ -208,12 +281,12 @@ export class KeygateStorage {
 
 	/** The cached license key, or `null`. */
 	async readLicenseKey(): Promise<string | null> {
-		const value = await this.readEncrypted('key');
-		if (value === null) {
+		const secret = await this.readEncrypted('key');
+		if (secret === null) {
 			return null;
 		}
 		try {
-			const parsed = JSON.parse(value) as { key?: unknown };
+			const parsed = JSON.parse(secret.value) as { key?: unknown };
 			return typeof parsed.key === 'string' && parsed.key.length > 0 ? parsed.key : null;
 		} catch {
 			return null;
@@ -232,12 +305,12 @@ export class KeygateStorage {
 
 	/** The cached token, or `null`. */
 	async readToken(): Promise<CachedToken | null> {
-		const value = await this.readEncrypted('token');
-		if (value === null) {
+		const secret = await this.readEncrypted('token');
+		if (secret === null) {
 			return null;
 		}
 		try {
-			const parsed = JSON.parse(value) as Partial<CachedToken>;
+			const parsed = JSON.parse(secret.value) as Partial<CachedToken>;
 			if (
 				typeof parsed.token !== 'string' ||
 				typeof parsed.payload !== 'object' ||
@@ -276,12 +349,12 @@ export class KeygateStorage {
 	 * server can still verify the token it already holds.
 	 */
 	async readPublicKey(): Promise<string | null> {
-		const value = await this.readEncrypted('pubkey');
-		if (value === null) {
+		const secret = await this.readEncrypted('pubkey');
+		if (secret === null) {
 			return null;
 		}
 		try {
-			const parsed = JSON.parse(value) as { publicKey?: unknown };
+			const parsed = JSON.parse(secret.value) as { publicKey?: unknown };
 			return typeof parsed.publicKey === 'string' && parsed.publicKey.length > 0
 				? parsed.publicKey
 				: null;
