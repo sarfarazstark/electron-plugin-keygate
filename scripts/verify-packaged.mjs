@@ -26,15 +26,30 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
-/** Run a command and fail loudly if it does. */
-function run(command, args, cwd, label) {
+/**
+ * Run a command and fail loudly if it does.
+ *
+ * `cleanEnv` names the environment variables to drop from the child.
+ * It exists for npm's `allow-scripts`: `npm run` copies the developer's
+ * own ~/.npmrc into the script's environment as
+ * `npm_config_allow_scripts`, and npm reads that as a cli-layer policy.
+ * In a project-scoped install a cli-layer policy is an error, so the
+ * install would fail on any machine whose ~/.npmrc sets the option --
+ * and the failure would look like the package was broken rather than
+ * like a machine-specific setting.
+ */
+function run(command, args, cwd, label, { cleanEnv = [] } = {}) {
 	console.log(`  ${label}…`);
+	const env = { ...process.env };
+	for (const key of cleanEnv) {
+		delete env[key];
+	}
 	const result = spawnSync(command, args, {
 		cwd,
 		stdio: 'inherit',
 		shell: process.platform === 'win32',
 		env: {
-			...process.env,
+			...env,
 			ELECTRON_CACHE: process.env.ELECTRON_CACHE ?? `${process.env.LOCALAPPDATA}\\electron\\Cache`,
 		},
 	});
@@ -98,7 +113,25 @@ try {
 	);
 
 	// 3. Install and build.
-	run('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline'], appDirectory, 'installing');
+	//
+	// The install-script policy goes in the project `.npmrc`.
+	//
+	// npm layers this setting as cli/env > project .npmrc > package.json
+	// > user/global .npmrc, and the first layer that says anything wins.
+	// A cli-layer policy is an error in a project-scoped install, so the
+	// project `.npmrc` has to sit above it -- which it does, once the
+	// inherited `npm_config_allow_scripts` is out of the environment.
+	//
+	// `package.json#allowScripts` alone is not enough: it sits *below*
+	// the .npmrc cascade, so a developer's ~/.npmrc would still win.
+	await writeFile(
+		join(appDirectory, '.npmrc'),
+		['fund=false', 'audit=false', 'allow-scripts=electron,esbuild,electron-winstaller', ''].join('\n'),
+		'utf8',
+	);
+	run('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline'], appDirectory, 'installing', {
+		cleanEnv: ['npm_config_allow_scripts', 'npm_config_allow-scripts'],
+	});
 	run('node', ['build.mjs'], appDirectory, 'building the app');
 
 	// The dependency must be the packed tarball's contents, not the
