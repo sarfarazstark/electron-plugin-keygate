@@ -9,6 +9,14 @@
 		"type": "git",
 		"url": "git+https://github.com/sarfarazstark/electron-plugin-keygate.git"
 	},
+	"homepage": "https://github.com/sarfarazstark/electron-plugin-keygate#readme",
+	"bugs": {
+		"url": "https://github.com/sarfarazstark/electron-plugin-keygate/issues"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
+	},
 	"type": "module",
 	"main": "./dist/main/index.js",
 	"types": "./dist/main/index.d.ts",
