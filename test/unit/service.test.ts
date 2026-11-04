@@ -9,7 +9,7 @@ import { buildSafeStorageCodec, KeygateStorage } from '../../lib/main/storage.ts
 import type { SafeStorageLike } from '../../lib/main/storage.ts';
 import { createSilentLogger } from '../../lib/main/logger.ts';
 import { KeygateError } from '../../lib/shared/errors.ts';
-import { createFakeSafeStorage } from '../support/fake-storage.ts';
+import { createAsyncSafeStorage, createFakeSafeStorage } from '../support/fake-storage.ts';
 import { createMockServer } from '../support/mock-server.ts';
 import type { MockServer } from '../support/mock-server.ts';
 
@@ -231,5 +231,42 @@ describe('storage policy', () => {
 		await service.resetLicenseKey();
 
 		expect(await storage.readLicenseKey()).toBeNull();
+	});
+
+	it('reports no persistence until the vault has been probed', () => {
+		const server = createMockServer();
+		const { service } = buildService(server);
+
+		// Nothing has checked yet, so claiming `true` would be a guess.
+		expect(service.persistsLicenses).toBe(false);
+	});
+
+	it('reports persistence once init has probed the async vault', async () => {
+		const server = createMockServer();
+		const { service } = buildService(server, createAsyncSafeStorage());
+
+		await service.init();
+
+		expect(service.persistsLicenses).toBe(true);
+		expect(service.startupDiagnostic.reason).toBe('no-cache');
+	});
+
+	it('restores a cached license offline on the async vault', async () => {
+		const server = createMockServer();
+
+		// Activate online, as Electron 45+ would.
+		const first = buildService(server, createAsyncSafeStorage());
+		await first.service.activate({ key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY' });
+
+		// Then a fresh process, offline: only the cache is available.
+		const offlineServer = createMockServer();
+		const second = buildService(offlineServer, createAsyncSafeStorage());
+		await second.service.init();
+
+		expect(second.service.startupDiagnostic.reason).toBe('restored');
+		expect(second.service.getLicense()?.valid).toBe(true);
+		expect(second.service.getLicense()?.offline).toBe(true);
+		// The object-shaped decrypt is what makes this work at all.
+		expect(offlineServer.requests).toHaveLength(0);
 	});
 });
