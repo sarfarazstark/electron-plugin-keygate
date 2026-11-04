@@ -309,6 +309,23 @@ ciphertext, and then starts a **second process with the network gone** to
 prove the offline restore works. Set `KEYGATE_ELECTRON_PATH` to run it against
 a different Electron build.
 
+Those checks all release the slot they took, so the server is left as it was
+found. To take one and **keep** it — to see the activation in the portal, or
+to test against a machine that is already licensed:
+
+```sh
+KEYGATE_LIVE_URL=http://localhost:9000 \
+KEYGATE_LIVE_KEY=KG-XXXX-XXXX-XXXX-XXXX \
+  npm run activate:live
+```
+
+It uses the same device identifier a real install derives from the machine id,
+so the activation looks like a real one. Release it again with:
+
+```sh
+npm run activate:live -- --release <identifier>
+```
+
 ## Deliberately absent
 
 - No arbitrary-invoke channel, no filesystem channel, and no channel that

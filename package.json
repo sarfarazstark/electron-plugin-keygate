@@ -47,6 +47,7 @@
 		"verify:electron": "node scripts/verify-electron.mjs",
 		"verify:live": "node scripts/verify-live.mjs",
 		"verify:live-electron": "node scripts/verify-live-electron.mjs",
+		"activate:live": "node scripts/activate-live.mjs",
 		"verify:packaged": "npm run build && node scripts/verify-packaged.mjs",
 		"smoke": "node scripts/smoke.mjs",
 		"prepublishOnly": "npm run build"
