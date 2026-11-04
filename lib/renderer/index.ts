@@ -98,17 +98,29 @@ async function unwrap<T>(operation: Promise<unknown>): Promise<T> {
  *
  * `null` — the window has no preload — produces an API whose every call
  * fails with `NO_KEYGATE_BRIDGE`, rather than a missing export.
+ *
+ * The bridge is read **per call** when a resolver is given, so a
+ * preload that installs the bridge after this module is evaluated still
+ * works. Electron runs the preload first, but a bundler that hoists
+ * this module's evaluation above the preload's would otherwise see no
+ * bridge at all.
  */
-export function createKeygateLicensingApi(bridge: KeygateBridge | null): KeygateLicensingAPI {
+export function createKeygateLicensingApi(
+	bridge: KeygateBridge | null | (() => KeygateBridge | null),
+): KeygateLicensingAPI {
+	const resolve = (): KeygateBridge | null =>
+		typeof bridge === 'function' ? bridge() : bridge;
+
 	const require = (): KeygateBridge => {
-		if (!bridge) {
+		const found = resolve();
+		if (!found) {
 			throw new KeygateError({
 				code: 'NO_KEYGATE_BRIDGE',
 				detail:
 					'no keygate preload bridge is installed on this window; add the preload to the webPreferences',
 			});
 		}
-		return bridge;
+		return found;
 	};
 
 	return {
@@ -139,9 +151,15 @@ export function createKeygateLicensingApi(bridge: KeygateBridge | null): Keygate
 	};
 }
 
-/** The API bound to this window's bridge. */
+/**
+ * The API bound to this window's bridge.
+ *
+ * The bridge is looked up on each call rather than captured here, so
+ * the order in which the preload and this module are evaluated does not
+ * matter.
+ */
 export const keygate: KeygateLicensingAPI = createKeygateLicensingApi(
-	typeof globalThis !== 'undefined' ? globalThis.keygate ?? null : null,
+	() => (typeof globalThis !== 'undefined' ? globalThis.keygate ?? null : null),
 );
 
 export { KeygateError, isKeygateError, asKeygateError } from '../shared/errors.ts';

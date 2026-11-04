@@ -109,6 +109,19 @@ describe('the renderer API', () => {
 		});
 	});
 
+	it('looks the bridge up per call when given a resolver', async () => {
+		// The preload normally installs the bridge before this module is
+		// evaluated, but a bundler that hoists the evaluation would
+		// otherwise see no bridge at all.
+		let installed: KeygateBridge | null = null;
+		const api = createKeygateLicensingApi(() => installed);
+
+		await expect(api.getLicense()).rejects.toMatchObject({ code: 'NO_KEYGATE_BRIDGE' });
+
+		installed = bridgeReturning({ ok: true, data: { valid: true } });
+		await expect(api.getLicense()).resolves.toEqual({ valid: true });
+	});
+
 	it('reports an unknown envelope shape', async () => {
 		const api = createKeygateLicensingApi(bridgeReturning({ nothing: 'useful' }));
 
