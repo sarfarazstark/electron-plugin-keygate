@@ -271,6 +271,44 @@ Electron 30 through 46 and beyond: the synchronous trio on 30–45, the
 asynchronous trio on 45+. Electron 46 removed the synchronous one, so the
 asynchronous API is preferred whenever it is present.
 
+## Testing
+
+| Command | What it does |
+| --- | --- |
+| `npm test` | The whole automated suite. The live tests skip themselves. |
+| `npm run typecheck` | TypeScript, no emit. |
+| `npm run build` | Bundles the five entry points and writes the declarations. |
+| `npm run smoke` | Checks that every entry point and the `exports` map resolve. |
+| `npm run verify:electron` | A real Electron, a sandboxed renderer, every channel. |
+| `npm run verify:packaged` | Installs the tarball into an app, packages it, runs it. |
+
+The checks that need a real server take the URL and the key from the
+environment. **The key is never written to disk** — only ciphertext is:
+
+```sh
+KEYGATE_LIVE_URL=http://localhost:9000 \
+KEYGATE_LIVE_KEY=KG-XXXX-XXXX-XXXX-XXXX \
+  npm run test:live            # the client against a live server
+```
+
+```sh
+KEYGATE_LIVE_URL=http://localhost:9000 \
+KEYGATE_LIVE_KEY=KG-XXXX-XXXX-XXXX-XXXX \
+  npm run verify:live          # the same, reporting each step
+```
+
+```sh
+KEYGATE_LIVE_URL=http://localhost:9000 \
+KEYGATE_LIVE_KEY=KG-XXXX-XXXX-XXXX-XXXX \
+  npm run verify:live-electron # a real Electron, the real OS vault
+```
+
+`verify:live-electron` is the one that cannot be faked: it activates a real
+license, lets the real `safeStorage` encrypt it, checks the files on disk are
+ciphertext, and then starts a **second process with the network gone** to
+prove the offline restore works. Set `KEYGATE_ELECTRON_PATH` to run it against
+a different Electron build.
+
 ## Deliberately absent
 
 - No arbitrary-invoke channel, no filesystem channel, and no channel that

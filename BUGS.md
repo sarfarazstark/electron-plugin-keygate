@@ -121,8 +121,9 @@ and both are covered by `test/unit/storage.ts`.
 
 **Verified here:** through `safeStorage` doubles that reproduce both
 generations, including the object-shaped decrypt and the `shouldReEncrypt`
-rotation. The Windows DPAPI path was exercised against a real vault, in a
-packaged application.
+rotation, and against real Electron builds — 40.10.6 for the synchronous API
+and 45.2.3 for the asynchronous one — using the real Windows vault, with a
+real activation and a real offline restore.
 
 ## The device identifier is derived, not proven
 
@@ -224,21 +225,38 @@ token.
   field decides what ships, and the test asserts the source tree does
   not.
 
+**Verified against a live Keygate server:**
+
+- The API client against the running server: activate, verify, entitlements,
+  idempotent re-activation, and the release of the slot.
+- The token the Go server signed verifying against the public key the Go
+  server published, and the device binding matching the server's own
+  definition.
+- The whole service against the server, including the cache and the offline
+  restore, using a token the server actually signed.
+- A real Electron app, with the **real operating-system vault**, activating
+  against the server and then restoring the license in a second process with
+  an unreachable server. The files on disk were checked to be ciphertext.
+
+**Verified against a real Electron, on both generations of the vault API:**
+
+- Electron 40.10.6 — the synchronous `safeStorage` API.
+- Electron 45.2.3 — the asynchronous API. The package prefers it whenever it
+  is present, so this is the path the refactor introduced. The build's own
+  `decryptStringAsync` was checked to resolve with an object, and the
+  offline restore was made from what that object carried.
+
 **Not verified here:**
 
 - macOS Keychain and Linux libsecret. The `safeStorage` behaviour was
-  exercised through doubles, not on those platforms.
-- Electron 46 itself. The synchronous/async split was reproduced through
-  doubles; the installed Electron was 40, which still has the synchronous
-  API.
+  exercised through doubles on Windows, not on those platforms.
+- Electron 46 itself. It is at `46.0.0-alpha.5`, so it could not be run;
+  its published type definitions carry the same
+  `{ shouldReEncrypt, result }` shape as 45's, which was checked against the
+  package's own types.
 - A packaged installer (NSIS, MSI). The application was packaged
   unpacked, with `electron-builder --dir`; the asar layout is the same
   either way, but the installer's own behaviour was not exercised.
-- The real Keygate server end to end. The protocol was reproduced
-  faithfully against the server's own source — the envelope, the
-  endpoints, the token format and the fingerprint definition — and the
-  live suite exists (`npm run test:live`) but needs a real server and a
-  real license key.
 - Windows DPAPI against another process running as the same user.
 
 ## Not implemented on purpose
