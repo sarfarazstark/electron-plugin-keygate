@@ -53,18 +53,43 @@ export type KeygateErrorCode =
 export interface KeygateErrorShape {
 	code: KeygateErrorCode;
 	detail: string;
+	/**
+	 * The server's structured error details, verbatim.
+	 *
+	 * This is where the actionable part of a failure lives: `max` and
+	 * `current` when the device limit is reached, `retry_after` when the
+	 * address is locked out, `used` and `limit` when a quota is spent.
+	 * The message alone rarely says how much room is left, and an app
+	 * that cannot show "2 of 3 devices in use" cannot explain itself.
+	 */
+	details?: Record<string, unknown>;
+	/**
+	 * How long to wait before retrying, in seconds.
+	 *
+	 * Taken from the `Retry-After` header the server sends with a 429,
+	 * falling back to `details.retry_after`.
+	 */
+	retryAfterSeconds?: number;
 }
 
 /** The error type the renderer entry throws. */
 export class KeygateError extends Error implements KeygateErrorShape {
 	readonly code: KeygateErrorCode;
 	readonly detail: string;
+	readonly details?: Record<string, unknown>;
+	readonly retryAfterSeconds?: number;
 
 	constructor(error: KeygateErrorShape) {
 		super(`Keygate Error: ${error.code}: ${error.detail}`);
 		this.name = 'KeygateError';
 		this.code = error.code;
 		this.detail = error.detail;
+		if (error.details !== undefined) {
+			this.details = error.details;
+		}
+		if (error.retryAfterSeconds !== undefined) {
+			this.retryAfterSeconds = error.retryAfterSeconds;
+		}
 	}
 }
 

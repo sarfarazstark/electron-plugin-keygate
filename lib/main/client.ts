@@ -18,6 +18,7 @@
  * body *is* the credential — the server dropped the API-key gate
  * because a key embedded in a shipped binary is not a secret.
  */
+import { randomUUID } from 'node:crypto';
 import { KeygateError } from '../shared/errors.ts';
 import type { KeygateEntitlements, KeygateFeatureStatus } from '../shared/types.ts';
 import type { KeygateConfig } from './config.ts';
@@ -27,6 +28,66 @@ interface KeygateEnvelope<T> {
 	success: boolean;
 	data?: T;
 	error?: { code?: string; message?: string; details?: unknown };
+}
+
+/**
+ * The server's `error.details`, when it is a structured object.
+ *
+ * It carries the numbers that make a failure explainable: how many
+ * devices are in use, how long the lockout lasts. Anything that is not
+ * a plain object is dropped rather than passed on as `unknown`.
+ */
+function readDetails(details: unknown): Record<string, unknown> | undefined {
+	if (typeof details !== 'object' || details === null || Array.isArray(details)) {
+		return undefined;
+	}
+	return details as Record<string, unknown>;
+}
+
+/** The `Retry-After` header, in seconds. */
+function readRetryAfter(response: { headers?: { get(name: string): string | null } }): number | undefined {
+	const raw = response.headers?.get('retry-after');
+	if (typeof raw !== 'string') {
+		return undefined;
+	}
+	const seconds = Number.parseInt(raw.trim(), 10);
+	return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+}
+
+/** `details.retry_after`, which the server sends alongside the header. */
+function readRetryAfterFromDetails(details: Record<string, unknown> | undefined): number | undefined {
+	const value = details?.retry_after;
+	if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+		return Math.ceil(value);
+	}
+	if (typeof value === 'string') {
+		const seconds = Number.parseInt(value, 10);
+		return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+	}
+	return undefined;
+}
+
+/**
+ * The sentence the app shows.
+ *
+ * The server's own message is kept, because it is the authority on what
+ * went wrong. The one exception is a floating licence: the server points
+ * at `/license/floating/checkout`, which this package deliberately does
+ * not implement, so the message says so rather than sending the app off
+ * to an endpoint it cannot call.
+ */
+function describeFailure(
+	code: unknown,
+	message: unknown,
+	path: string,
+	status: number,
+): string {
+	const text =
+		typeof message === 'string' && message.length > 0 ? message : `${path} answered ${status}`;
+	if (code === 'FLOATING_LICENSE') {
+		return `${text} This package does not implement floating licences: it activates a device and keeps a signed token for it, which is a different licensing model.`;
+	}
+	return text;
 }
 
 export interface KeygateActivateData {
@@ -69,6 +130,8 @@ export type FetchLike = (
 	ok: boolean;
 	status: number;
 	json(): Promise<unknown>;
+	/** Only the `Retry-After` header is read, and only if it is there. */
+	headers?: { get(name: string): string | null };
 }>;
 
 export interface KeygateClientOptions {
@@ -83,6 +146,15 @@ export class KeygateClient {
 	private readonly config: KeygateConfig;
 	private readonly fetchImpl: FetchLike;
 	private readonly defaultHeaders: Record<string, string>;
+	/**
+	 * The idempotency key of an activation whose outcome is unknown.
+	 *
+	 * Keyed by the exact request body, so the key and the body always
+	 * agree: the server rejects a reused key that arrives with a
+	 * different body, and a key this package generated could never be
+	 * paired with a body it did not send.
+	 */
+	private readonly pendingActivations = new Map<string, string>();
 
 	constructor(options: KeygateClientOptions) {
 		this.config = options.config;
@@ -108,7 +180,12 @@ export class KeygateClient {
 	 * A failure never throws an opaque error: the server's own code is
 	 * carried through verbatim, so the renderer can branch on it.
 	 */
-	private async request<T>(path: string, body: unknown, method = 'POST'): Promise<T> {
+	private async request<T>(
+		path: string,
+		body: unknown,
+		method = 'POST',
+		extraHeaders: Record<string, string> = {},
+	): Promise<T> {
 		const controller = new AbortController();
 		const timer = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
 
@@ -120,6 +197,7 @@ export class KeygateClient {
 					accept: 'application/json',
 					'content-type': 'application/json',
 					...this.defaultHeaders,
+					...extraHeaders,
 				},
 				body: body === undefined ? undefined : JSON.stringify(body),
 				signal: controller.signal,
@@ -163,15 +241,18 @@ export class KeygateClient {
 		if (envelope.success === false || envelope.error !== undefined) {
 			const code = envelope.error?.code;
 			const message = envelope.error?.message;
+			const details = readDetails(envelope.error?.details);
+			const retryAfterSeconds =
+				readRetryAfter(response) ?? readRetryAfterFromDetails(details);
+
 			throw new KeygateError({
 				// The server's code is the useful part; it says whether the
 				// license is unknown, expired, suspended, or the device
 				// already holds a different key.
 				code: typeof code === 'string' && code.length > 0 ? code : 'HTTP_ERROR',
-				detail:
-					typeof message === 'string' && message.length > 0
-						? message
-						: `${path} answered ${response.status}`,
+				detail: describeFailure(code, message, path, response.status),
+				...(details !== undefined ? { details } : {}),
+				...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
 			});
 		}
 
@@ -193,7 +274,20 @@ export class KeygateClient {
 		return data;
 	}
 
-	/** Register this device against a license and get a signed token. */
+	/**
+	 * Register this device against a license and get a signed token.
+	 *
+	 * The request carries an `Idempotency-Key`, so a retry of the same
+	 * activation is answered from the server's cache instead of running
+	 * the handler again.
+	 *
+	 * The key is reused only while the outcome is *unknown* — a timeout
+	 * or a dropped connection, where the server may have activated the
+	 * device before the answer was lost. As soon as the server answers,
+	 * the key is dropped: the server caches 4xx as well as 2xx, so a key
+	 * that outlived a refusal would keep replaying that refusal, and a
+	 * later genuine attempt would never reach the handler.
+	 */
 	async activate(input: {
 		key: string;
 		identifier: string;
@@ -207,14 +301,36 @@ export class KeygateClient {
 		if (input.label !== undefined && input.label.length > 0) {
 			body.label = input.label;
 		}
-		const data = await this.request<KeygateActivateData>('/license/activate', body);
-		if (typeof data?.token !== 'string' || data.token.length === 0) {
-			throw new KeygateError({
-				code: 'BAD_RESPONSE',
-				detail: 'the activate endpoint answered without a token',
+
+		// The body is the scope of the key: the server hashes the body it
+		// receives, so a key and a body that always agree can never be
+		// reported as a conflict.
+		const bodyText = JSON.stringify(body);
+		const idempotencyKey = this.pendingActivations.get(bodyText) ?? randomUUID();
+
+		try {
+			const data = await this.request<KeygateActivateData>('/license/activate', body, 'POST', {
+				'Idempotency-Key': idempotencyKey,
 			});
+			this.pendingActivations.delete(bodyText);
+			if (typeof data?.token !== 'string' || data.token.length === 0) {
+				throw new KeygateError({
+					code: 'BAD_RESPONSE',
+					detail: 'the activate endpoint answered without a token',
+				});
+			}
+			return data;
+		} catch (err) {
+			// A request that never got an answer leaves the outcome open.
+			// Keep the key, so the next attempt is answered from the
+			// cache rather than activating a second time.
+			if (err instanceof KeygateError && err.code === 'REQUEST_ERROR') {
+				this.pendingActivations.set(bodyText, idempotencyKey);
+			} else {
+				this.pendingActivations.delete(bodyText);
+			}
+			throw err;
 		}
-		return data;
 	}
 
 	/** Check the license and this device's activation. */

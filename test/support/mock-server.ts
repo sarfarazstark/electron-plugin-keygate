@@ -12,6 +12,25 @@ import { createHash, generateKeyPairSync, sign as cryptoSign } from 'node:crypto
 import type { KeygateTokenPayload } from '../../lib/shared/types.ts';
 import type { FetchLike } from '../../lib/main/client.ts';
 
+/**
+ * A failure the server answers with instead of its normal answer.
+ *
+ * The real server puts the actionable numbers in `error.details` and
+ * sends `Retry-After` with a 429. A mock that cannot reproduce that
+ * cannot catch a client that drops it.
+ */
+export interface MockFailure {
+	status: number;
+	code: string;
+	message: string;
+	/** The server's structured error details. */
+	details?: Record<string, unknown>;
+	/** Seconds to wait, sent as the `Retry-After` header. */
+	retryAfterSeconds?: number;
+	/** Any other response headers. */
+	headers?: Record<string, string>;
+}
+
 export interface MockServerOptions {
 	/** The license key the server accepts. */
 	licenseKey?: string;
@@ -39,6 +58,8 @@ export interface MockServerOptions {
 	features?: Record<string, unknown>;
 	/** The status recorded in the token. */
 	status?: string;
+	/** A failure to answer with instead of the normal answer. */
+	failure?: MockFailure;
 }
 
 export interface MockServer {
@@ -57,6 +78,8 @@ export interface MockServer {
 	requests: Array<{ path: string; method: string; body: unknown }>;
 	/** Change what the server answers next. */
 	set(options: Partial<MockServerOptions>): void;
+	/** Answer with a failure instead of the normal answer. Pass null to stop. */
+	failWith(failure: MockFailure | null): void;
 }
 
 const DEFAULT_LICENSE_KEY = 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY';
@@ -95,7 +118,7 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 			| 'graceDays'
 			| 'status'
 		>
-	> & { features: Record<string, unknown>; tokenIdentifier: string | undefined };
+	> & { features: Record<string, unknown>; tokenIdentifier: string | undefined; failure: MockFailure | null };
 
 	const reset = (): void => {
 		state = {
@@ -109,6 +132,7 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 			graceDays: options.graceDays ?? 0,
 			status: options.status ?? 'active',
 			features: options.features ?? { premium_support: true, api_calls: '50000' },
+			failure: options.failure ?? null,
 		};
 	};
 	reset();
@@ -150,10 +174,32 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 		path: string,
 		method: string,
 		body: Record<string, unknown> | undefined,
-	): { status: number; body: unknown } => {
+	): { status: number; body: unknown; headers?: Record<string, string> } => {
 		const now = Math.floor(Date.now() / 1000);
 		const key = typeof body?.license_key === 'string' ? body.license_key : '';
 		const identifier = typeof body?.identifier === 'string' ? body.identifier : '';
+
+		if (state.failure) {
+			const failure = state.failure;
+			const headers: Record<string, string> = {
+				...(failure.headers ?? {}),
+				...(failure.retryAfterSeconds !== undefined
+					? { 'retry-after': String(failure.retryAfterSeconds) }
+					: {}),
+			};
+			return {
+				status: failure.status,
+				body: {
+					success: false,
+					error: {
+						code: failure.code,
+						message: failure.message,
+						...(failure.details ? { details: failure.details } : {}),
+					},
+				},
+				...(Object.keys(headers).length > 0 ? { headers } : {}),
+			};
+		}
 
 		if (path === '/license/pubkey' && method === 'GET') {
 			return {
@@ -251,6 +297,9 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 			async json() {
 				return result.body;
 			},
+			headers: {
+				get: (name: string) => result.headers?.[name.toLowerCase()] ?? null,
+			},
 		};
 	};
 
@@ -274,6 +323,10 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
 			if (next.graceDays !== undefined) state.graceDays = next.graceDays;
 			if (next.status !== undefined) state.status = next.status;
 			if (next.features !== undefined) state.features = next.features;
+			if (next.failure !== undefined) state.failure = next.failure;
+		},
+		failWith(failure) {
+			state.failure = failure;
 		},
 	};
 }

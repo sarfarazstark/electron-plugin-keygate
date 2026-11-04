@@ -76,7 +76,20 @@ function toEnvelope<T>(run: () => Promise<T> | T): Promise<IpcResult<T>> {
 		.then((data) => ({ ok: true as const, data }))
 		.catch((err: unknown) => {
 			const error = asKeygateError(err);
-			return { ok: false as const, error: { code: error.code, detail: error.detail } };
+			return {
+				ok: false as const,
+				error: {
+					code: error.code,
+					detail: error.detail,
+					// The details are the actionable part of a failure --
+					// how many devices are in use, how long the lockout
+					// lasts -- so they have to survive the crossing.
+					...(error.details !== undefined ? { details: error.details } : {}),
+					...(error.retryAfterSeconds !== undefined
+						? { retryAfterSeconds: error.retryAfterSeconds }
+						: {}),
+				},
+			};
 		});
 }
 

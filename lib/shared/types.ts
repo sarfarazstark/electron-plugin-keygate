@@ -24,7 +24,19 @@ export type KeygateChannel = (typeof KEYGATE_CHANNELS)[keyof typeof KEYGATE_CHAN
  * boundary: `contextBridge` strips custom fields off thrown objects, so a
  * failure has to travel as data.
  */
-export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: { code: string; detail: string } };
+export type IpcResult<T> =
+	| { ok: true; data: T }
+	| {
+			ok: false;
+			error: {
+				code: string;
+				detail: string;
+				/** The server's structured error details, verbatim. */
+				details?: Record<string, unknown>;
+				/** Seconds to wait before retrying, when the server said so. */
+				retryAfterSeconds?: number;
+			};
+	  };
 
 /** A single entitlement as the Keygate server reports it. */
 export interface KeygateFeatureStatus {

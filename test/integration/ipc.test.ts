@@ -247,4 +247,29 @@ describe('argument validation over IPC', () => {
 			expect(result.error.code).toBe('LICENSING_DISABLED');
 		}
 	});
+
+	it('carries the details and the retry delay across the boundary', async () => {
+		const server = createMockServer();
+		const { ipc } = buildIpc(server);
+
+		// The server's own numbers, on a failure the app has to explain.
+		server.failWith({
+			status: 409,
+			code: 'ACTIVATION_LIMIT',
+			message: 'maximum activations reached',
+			details: { max: 3, current: 3 },
+			retryAfterSeconds: 60,
+		});
+
+		const result = await ipc.call(KEYGATE_CHANNELS.activate, makeEvent(TRUSTED_ID), {
+			key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY',
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('ACTIVATION_LIMIT');
+			expect(result.error.details).toEqual({ max: 3, current: 3 });
+			expect(result.error.retryAfterSeconds).toBe(60);
+		}
+	});
 });
