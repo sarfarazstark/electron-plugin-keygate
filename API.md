@@ -94,8 +94,18 @@ keygateSandboxedPreloadPath(): string // dist/preload/sandboxed.cjs — for sand
 Both resolve through the package's `exports` map, with a `dist/`
 fallback for a source checkout with no install step.
 
-### The service
+The package directory is found with **Node's own resolution** —
+`require.resolve('electron-plugin-keygate/package.json')` walks the
+`node_modules` chain from the calling file — and the package's `exports`
+map decides the file name.
 
+That detail matters: an app that bundles its main script inlines this
+package's code, and `import.meta.url` then points at the *app's* bundle
+rather than at the package. Resolving relative to it produced a path
+inside the app's own directory, where there is no preload file, and the
+renderer silently found no bridge.
+
+### The service
 `LicensingService` is a **main-process** object. The renderer only ever
 sees the eight channels.
 
@@ -134,6 +144,24 @@ tokenBindingMatches(payload, identifier): boolean
 buildMachineIdentity(options?): Promise<MachineIdentity>
 KeygateError  asKeygateError(err): KeygateError  isKeygateError(err): boolean
 ```
+
+### The preload path helpers
+
+```ts
+keygatePreloadPath(): string          // dist/preload/index.mjs   — unsandboxed only
+keygateSandboxedPreloadPath(): string // dist/preload/sandboxed.cjs — for sandbox: true
+```
+
+The package directory is found with **Node's own resolution** —
+`require.resolve('electron-plugin-keygate/package.json')` walks the
+`node_modules` chain from the calling file — and the package's `exports`
+map decides the file name.
+
+That detail matters: an app that bundles its main script inlines this
+package's code, and `import.meta.url` then points at the *app's* bundle
+rather than at the package. Resolving relative to it produced a path
+inside the app's own directory, where there is no preload file, and the
+renderer silently found no bridge.
 
 ---
 
@@ -349,6 +377,7 @@ Under `app.getPath("userData")`:
 ```
 userData/keygate/key     the license key — safeStorage ciphertext
 userData/keygate/token   the signed token and its state — safeStorage ciphertext
+userData/keygate/pubkey  the verification public key — safeStorage ciphertext
 ```
 
 | Rule | Where |
@@ -358,6 +387,12 @@ userData/keygate/token   the signed token and its state — safeStorage cipherte
 | Linux's `basic_text` backend counts as unusable | `vault.ts` / `storage.ts` |
 | `safeStorage`'s async API is used when present, the sync one otherwise | `storage.ts` |
 | the methods are always bound to the `safeStorage` object | `storage.ts` |
+
+The public key is cached because it is public information, and because an
+offline machine needs it: the token in the cache is verified against it
+without a network call. The resolution order is the pinned key, then the
+cached copy, then the server — the server is asked last so an offline
+launch never waits on a request that cannot succeed.
 
 Windows DPAPI protects against other **users** of the machine, not other
 applications running in the same session.
