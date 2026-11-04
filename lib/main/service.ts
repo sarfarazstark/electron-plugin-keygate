@@ -37,7 +37,7 @@ import type { Logger } from './logger.ts';
 import { buildMachineIdentity } from './machine.ts';
 import type { MachineIdentity } from './machine.ts';
 import type { CachedToken, KeygateStorage } from './storage.ts';
-import { evaluateTokenFreshness, expectedFingerprint, verifyToken } from './token.ts';
+import { evaluateTokenFreshness, tokenBindingMatches, verifyToken } from './token.ts';
 
 /** How the service was wired up. */
 export interface ServiceInitArgs {
@@ -535,28 +535,4 @@ export class LicensingService {
 			metadata: meta,
 		};
 	}
-}
-
-/**
- * Check that a token was issued for this device and product.
- *
- * The server binds the token to the pair with `fpr`. A token whose
- * binding does not match was issued for a different device, or a
- * different product, and must not be used here.
- */
-export function tokenBindingMatches(
-	payload: KeygateTokenPayload,
-	identifier: string,
-): boolean {
-	if (!payload.fpr) {
-		// A token without a binding is not bound to anything. Refusing it
-		// would break against a server that does not write one; accepting
-		// it silently would drop the check. The identifier comparison
-		// below still applies.
-		return payload.did === identifier;
-	}
-	if (payload.did !== identifier) {
-		return false;
-	}
-	return payload.fpr === expectedFingerprint(identifier, payload.pid);
 }

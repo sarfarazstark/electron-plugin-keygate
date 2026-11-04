@@ -264,3 +264,32 @@ export function expectedFingerprint(identifier: string, productId: string): stri
 	const digest = createHash('sha256').update(`${identifier}:${productId}`, 'utf8').digest();
 	return digest.subarray(0, 8).toString('hex');
 }
+
+/**
+ * Check that a token was issued for this device and product.
+ *
+ * The server binds the token to the pair with `fpr`. A token whose
+ * binding does not match was issued for a different device, or a
+ * different product, and must not be used here.
+ *
+ * The signature proves the server issued the token. This proves it
+ * issued it *for this device*: without it, a token copied from another
+ * machine would verify perfectly well and would leave this machine
+ * looking licensed.
+ */
+export function tokenBindingMatches(
+	payload: KeygateTokenPayload,
+	identifier: string,
+): boolean {
+	if (!payload.fpr) {
+		// A token without a binding is not bound to anything. Refusing it
+		// would break against a server that does not write one; accepting
+		// it silently would drop the check. The identifier comparison
+		// below still applies.
+		return payload.did === identifier;
+	}
+	if (payload.did !== identifier) {
+		return false;
+	}
+	return payload.fpr === expectedFingerprint(identifier, payload.pid);
+}
