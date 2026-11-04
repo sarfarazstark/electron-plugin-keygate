@@ -109,7 +109,68 @@ try {
 		`${Object.keys(entitlements.features).length} feature(s)`,
 	);
 
-	// 8. The slot is released.
+	// 8. The idempotency key the client sends is honoured by the server.
+	//    The same key with the same body must reach the handler once,
+	//    and the same key with a different body must be refused — which
+	//    is why the client scopes its key to the request body.
+	{
+		const idemKey = `keygate-verify-${Date.now().toString(36)}`;
+		const idemBody = {
+			license_key: key,
+			identifier: `${identifier}-idem`,
+			identifier_type: 'device',
+			label: 'verify-live-idem',
+		};
+		const send = (body) =>
+			fetch(`${url}/api/v1/license/activate`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', 'Idempotency-Key': idemKey },
+				body: JSON.stringify(body),
+			});
+
+		const first = await send(idemBody);
+		const firstJson = await first.json();
+		const second = await send(idemBody);
+		const secondJson = await second.json();
+
+		check(
+			'the same idempotency key replays instead of activating twice',
+			second.headers.get('idempotent-replayed') === 'true' &&
+				firstJson?.data?.token === secondJson?.data?.token,
+			`replayed ${second.headers.get('idempotent-replayed')}`,
+		);
+
+		const conflicting = await send({ ...idemBody, label: 'a different label' });
+		const conflictJson = await conflicting.json();
+		check(
+			'the same key with a different body is refused',
+			conflicting.status === 422 && conflictJson?.error?.code === 'IDEMPOTENCY_KEY_CONFLICT',
+			`${conflicting.status} ${conflictJson?.error?.code}`,
+		);
+
+		await fetch(`${url}/api/v1/license/deactivate`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ license_key: key, identifier: idemBody.identifier }),
+		});
+	}
+
+	// 9. A failure carries the numbers the app needs to explain itself.
+	{
+		let detailsSeen = null;
+		try {
+			await client.activate({ key: 'KG-NOTAREALKEY-NOTAREALKEY-NOTAREAL', identifier });
+		} catch (err) {
+			detailsSeen = err;
+		}
+		check(
+			'a failure arrives with its code and detail',
+			detailsSeen !== null && typeof detailsSeen.code === 'string' && detailsSeen.code.length > 0,
+			detailsSeen?.code ?? '(no error)',
+		);
+	}
+
+	// 10. The slot is released.
 	await client.deactivate({ key, identifier });
 	let released = false;
 	try {
