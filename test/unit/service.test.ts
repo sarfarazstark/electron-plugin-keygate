@@ -233,6 +233,106 @@ describe('storage policy', () => {
 		expect(await storage.readLicenseKey()).toBeNull();
 	});
 
+	it('clears the cache when the server no longer knows the license', async () => {
+		const server = createMockServer();
+		const { service, storage } = buildService(server);
+		await service.activate({ key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY' });
+		expect(await storage.readToken()).not.toBeNull();
+
+		// The server withdraws the license: it answers 404, which it uses
+		// for a license that does not exist, one that is suspended or
+		// revoked, and one where this device has no activation.
+		server.failWith({
+			status: 404,
+			code: 'LICENSE_NOT_FOUND',
+			message: 'license not found',
+		});
+
+		await expect(service.verify({})).rejects.toThrowError();
+
+		// Nothing is left that could restore the license on the next
+		// launch.
+		expect(await storage.readToken()).toBeNull();
+		expect(await storage.readLicenseKey()).toBeNull();
+		expect(service.getLicense()).toBeNull();
+	});
+
+	it('keeps the cache when a different key fails to verify', async () => {
+		const server = createMockServer();
+		const { service, storage } = buildService(server);
+		await service.activate({ key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY' });
+
+		server.failWith({
+			status: 404,
+			code: 'LICENSE_NOT_FOUND',
+			message: 'license not found',
+		});
+
+		// A customer trying a second license must not lose the one this
+		// device already holds.
+		await expect(service.verify({ key: 'KG-SOMEOTHERKEY-SOMEOTHERKEY-SOME' })).rejects.toThrowError();
+
+		expect(await storage.readToken()).not.toBeNull();
+		expect(await storage.readLicenseKey()).toBe('KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY');
+		expect(service.getLicense()).not.toBeNull();
+	});
+
+	it('keeps the cache when the failure is not about the license', async () => {
+		const server = createMockServer();
+		const { service, storage } = buildService(server);
+		await service.activate({ key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY' });
+
+		server.failWith({
+			status: 429,
+			code: 'LOCKED_OUT',
+			message: 'too many failed attempts',
+		});
+
+		await expect(service.verify({})).rejects.toThrowError();
+
+		// A lockout says nothing about the license, so nothing is
+		// cleared.
+		expect(await storage.readToken()).not.toBeNull();
+		expect(await storage.readLicenseKey()).toBe('KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY');
+	});
+
+	it('activates as a device by default', async () => {
+		const server = createMockServer();
+		const { service } = buildService(server);
+
+		await service.activate({ key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY' });
+
+		const request = server.requests.find((r) => r.path === '/license/activate');
+		expect((request?.body as { identifier_type?: string })?.identifier_type).toBe('device');
+	});
+
+	it('activates a person when the caller says so', async () => {
+		const server = createMockServer();
+		const { service } = buildService(server);
+
+		await service.activate({
+			key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY',
+			identifier: 'person@example.com',
+			identifierType: 'user',
+		});
+
+		const request = server.requests.find((r) => r.path === '/license/activate');
+		const body = request?.body as { identifier?: string; identifier_type?: string };
+		expect(body?.identifier).toBe('person@example.com');
+		expect(body?.identifier_type).toBe('user');
+	});
+
+	it('refuses a user activation with no identifier of its own', async () => {
+		const server = createMockServer();
+		const { service } = buildService(server);
+
+		// The machine id is not a person, so it must not be used as one.
+		await expect(
+			service.activate({ key: 'KG-TESTKEY-TESTKEY-TESTKEY-TESTKEY', identifierType: 'user' }),
+		).rejects.toThrowError(/identifier of the person/);
+		expect(server.requests).toHaveLength(0);
+	});
+
 	it('reports no persistence until the vault has been probed', () => {
 		const server = createMockServer();
 		const { service } = buildService(server);

@@ -32,7 +32,7 @@ import type {
 	KeygateTokenPayload,
 	VerifyOptions,
 } from '../shared/types.ts';
-import type { KeygateClient } from './client.ts';
+import type { KeygateClient, KeygateVerifyData } from './client.ts';
 import type { KeygateConfig } from './config.ts';
 import type { Logger } from './logger.ts';
 import { buildMachineIdentity } from './machine.ts';
@@ -255,9 +255,21 @@ export class LicensingService {
 	}
 
 	/** The identifier this machine activates under. */
-	private async resolveIdentifier(override?: string): Promise<string> {
+	private async resolveIdentifier(
+		override?: string,
+		identifierType: 'device' | 'user' = 'device',
+	): Promise<string> {
 		if (override && override.trim().length > 0) {
 			return override.trim();
+		}
+		// A person is not a machine, so the machine id is never the right
+		// answer here. The caller has to say which person.
+		if (identifierType === 'user') {
+			throw new KeygateError({
+				code: 'NO_IDENTIFIER',
+				detail:
+					'a user activation needs the identifier of the person, usually their email address; the machine identifier cannot stand in for it',
+			});
 		}
 		if (this.config.identifier) {
 			return this.config.identifier;
@@ -287,7 +299,8 @@ export class LicensingService {
 	 * to call again.
 	 */
 	async activate(options: ActivateOptions): Promise<KeygateLicense> {
-		const identifier = await this.resolveIdentifier(options.identifier);
+		const identifierType = options.identifierType ?? 'device';
+		const identifier = await this.resolveIdentifier(options.identifier, identifierType);
 		const label = options.label ?? (await this.resolveDeviceName());
 
 		// Probe the vault before the network call: a successful
@@ -299,6 +312,7 @@ export class LicensingService {
 			key: options.key,
 			identifier,
 			label,
+			identifierType,
 		});
 
 		const publicKey = await this.requirePublicKey();
@@ -320,9 +334,23 @@ export class LicensingService {
 	 * activation — deliberately the same answer for all three, so the
 	 * endpoint cannot be used to probe which keys are real. The error
 	 * code is passed through as the server sent it.
+	 *
+	 * A `LICENSE_NOT_FOUND` also clears what is cached, because the
+	 * server has just said the license does not work here. Keeping the
+	 * cached token would restore it on the next launch and let the app
+	 * keep running licensed on a license the server has withdrawn,
+	 * until the token's own check-in interval ran out. The key is
+	 * cleared too, so the app asks for one again rather than retrying
+	 * a key the server has rejected.
+	 *
+	 * The clearing only happens when the key that failed is the one
+	 * that was cached. Verifying some *other* key — a customer trying a
+	 * second license, say — must not throw away the license this device
+	 * already has.
 	 */
 	async verify(options: VerifyOptions): Promise<KeygateLicense> {
-		const key = options.key ?? (await this.storage.readLicenseKey());
+		const cachedKey = await this.storage.readLicenseKey();
+		const key = options.key ?? cachedKey;
 		if (!key) {
 			throw new KeygateError({
 				code: 'NO_LICENSE',
@@ -333,7 +361,25 @@ export class LicensingService {
 
 		await this.assertStorageUsable();
 
-		const data = await this.client.verify({ key, identifier });
+		let data: KeygateVerifyData;
+		try {
+			data = await this.client.verify({ key, identifier });
+		} catch (err) {
+			if (
+				err instanceof KeygateError &&
+				err.code === 'LICENSE_NOT_FOUND' &&
+				cachedKey !== null &&
+				cachedKey === key
+			) {
+				await this.storage.clearToken();
+				await this.storage.clearLicenseKey();
+				this.license = null;
+				this.log.warn(
+					'the server no longer recognises this license on this device; the cached license and key were cleared',
+				);
+			}
+			throw err;
+		}
 
 		const publicKey = await this.requirePublicKey();
 		const payload = verifyToken(data.token, publicKey);
