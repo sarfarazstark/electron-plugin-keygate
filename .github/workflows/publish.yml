@@ -1,0 +1,57 @@
+name: Publish
+
+# Publishes to npm through npm's trusted publishing (OIDC). No npm token is
+# stored in this repository — the job exchanges its GitHub identity for a
+# short-lived publish token.
+#
+# Before this workflow can publish, the package must have a trusted publisher
+# configured in npm:
+#
+#   npmjs.com -> electron-plugin-keygate -> Settings -> Trusted Publisher
+#     Organization or user : sarfarazstark
+#     Repository           : electron-plugin-keygate
+#     Workflow filename    : publish.yml
+#     Environment          : (leave empty)
+#
+# The first version has to be published by hand, because npm only lets a
+# package be configured after it exists.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          always-auth: true
+
+      - name: Install the dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Run the tests
+        run: npm test
+
+      - name: Publish
+        run: npm publish --provenance
