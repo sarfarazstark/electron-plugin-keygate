@@ -65,6 +65,7 @@ and talks to your users' machines.
 - [This is a Keygate client, not a Keygen one](#-this-is-a-keygate-client-not-a-keygen-one)
 - [Deliberately absent](#-deliberately-absent)
 - [Testing](#-testing)
+- [Try it](#-try-it)
 - [Documentation](#-documentation)
 - [Releasing](#-releasing)
 - [Licence](#-licence)
@@ -607,6 +608,32 @@ so the activation looks like a real one. Release it again with:
 ```sh
 npm run activate:live -- --release <identifier>
 ```
+
+<br />
+
+## 🖥 Try it
+
+[`examples/demo`](examples/demo) is a runnable Electron app that drives the
+whole surface — activate, verify, read the entitlements, release the slot,
+clear the state. It is the wiring from **Setup**, with buttons.
+
+```sh
+npm run build          # in the repository root
+cd examples/demo
+npm install
+npm start
+```
+
+It points at `http://localhost:9000` unless you say otherwise, and it shows
+the server it is really using in the header, so there is no guessing about
+where a license was checked.
+
+The other two examples are not apps to click:
+
+| | |
+| --- | --- |
+| [`examples/motus`](examples/motus) | The licensing wiring from a real app: the main-process module and the renderer hook. |
+| [`examples/packaged-app`](examples/packaged-app) | The fixture `npm run verify:packaged` installs, packages and runs. Headless on purpose. |
 
 <br />
 

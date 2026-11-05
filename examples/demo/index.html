@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:" />
+<title>Keygate demo</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+
+	:root {
+		--bg: #0f0c1c;
+		--panel: #171232;
+		--panel-2: #1e1740;
+		--line: #2e2560;
+		--text: #ece8fb;
+		--muted: #9a93bb;
+		--accent: #a78bfa;
+		--ok: #34d399;
+		--bad: #f87171;
+	}
+
+	body {
+		background: radial-gradient(900px 460px at 88% -6%, rgba(124, 58, 237, .35), transparent 62%),
+			radial-gradient(700px 400px at 4% 104%, rgba(109, 40, 217, .3), transparent 60%),
+			var(--bg);
+		color: var(--text);
+		font: 14px/1.5 'Segoe UI', Inter, system-ui, sans-serif;
+		min-height: 100vh;
+		padding: 22px 26px 30px;
+	}
+
+	header {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		flex-wrap: wrap;
+		padding-bottom: 16px;
+		border-bottom: 1px solid var(--line);
+	}
+
+	h1 { font-size: 19px; font-weight: 650; letter-spacing: -.01em; }
+	h1 em { font-style: normal; color: var(--accent); }
+
+	.server {
+		font-size: 12px;
+		color: var(--muted);
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		padding: 4px 11px;
+	}
+	.server b { color: var(--text); font-weight: 600; }
+
+	.spacer { flex: 1; }
+
+	.pill {
+		font-size: 12px;
+		font-weight: 650;
+		letter-spacing: .04em;
+		text-transform: uppercase;
+		padding: 5px 13px;
+		border-radius: 999px;
+		border: 1px solid var(--line);
+		color: var(--muted);
+	}
+	.pill[data-kind='ok'] { color: #062e21; background: var(--ok); border-color: transparent; }
+	.pill[data-kind='bad'] { color: #2b0b0b; background: var(--bad); border-color: transparent; }
+	.pill[data-kind='warn'] { color: #2b1f05; background: #fbbf24; border-color: transparent; }
+
+	.badge {
+		font-size: 11px;
+		font-weight: 650;
+		text-transform: uppercase;
+		letter-spacing: .04em;
+		color: #fbbf24;
+		border: 1px solid rgba(251, 191, 36, .4);
+		border-radius: 999px;
+		padding: 3px 10px;
+	}
+
+	.grid {
+		display: grid;
+		grid-template-columns: 1.15fr 1fr;
+		gap: 16px;
+		margin-top: 18px;
+		align-items: start;
+	}
+	@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+	.card {
+		background: linear-gradient(180deg, var(--panel-2), var(--panel));
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		padding: 16px 18px;
+	}
+
+	.card h2 {
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: .13em;
+		text-transform: uppercase;
+		color: var(--muted);
+		margin-bottom: 12px;
+	}
+
+	.row {
+		display: flex;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 5px 0;
+		border-bottom: 1px solid rgba(46, 37, 96, .5);
+	}
+	.row:last-child { border-bottom: 0; }
+	.row-label { color: var(--muted); flex: none; }
+	.row-value { text-align: right; word-break: break-word; }
+	.mono { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 12.5px; }
+
+	.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+	.chip {
+		font-size: 12px;
+		padding: 3px 10px;
+		border-radius: 999px;
+		background: rgba(167, 139, 250, .16);
+		border: 1px solid rgba(167, 139, 250, .38);
+		color: #e4dcff;
+	}
+	.chip.muted { background: transparent; border-color: var(--line); color: var(--muted); }
+
+	label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+
+	.key-row { display: flex; gap: 8px; }
+	input[type='password'], input[type='text'] {
+		flex: 1;
+		min-width: 0;
+		background: #100c22;
+		border: 1px solid var(--line);
+		border-radius: 9px;
+		color: var(--text);
+		padding: 9px 12px;
+		font: 13px 'Cascadia Mono', Consolas, monospace;
+	}
+	input:focus { outline: 2px solid rgba(167, 139, 250, .55); outline-offset: 1px; }
+
+	button {
+		background: #221a4d;
+		border: 1px solid var(--line);
+		color: var(--text);
+		border-radius: 9px;
+		padding: 9px 14px;
+		font: 600 13px 'Segoe UI', Inter, system-ui, sans-serif;
+		cursor: pointer;
+	}
+	button:hover:not(:disabled) { background: #2c2260; border-color: #453a86; }
+	button:disabled { opacity: .45; cursor: default; }
+	button.primary {
+		background: linear-gradient(180deg, #8b5cf6, #6d28d9);
+		border-color: transparent;
+		color: #fff;
+	}
+	button.primary:hover:not(:disabled) { background: linear-gradient(180deg, #9d78f8, #7c3aed); }
+
+	.buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+	.log { max-height: 260px; overflow: auto; }
+	.line {
+		display: flex;
+		gap: 10px;
+		padding: 5px 0;
+		border-bottom: 1px solid rgba(46, 37, 96, .5);
+		font-size: 12.5px;
+	}
+	.line:last-child { border-bottom: 0; }
+	.line .name { flex: none; width: 96px; font-weight: 600; }
+	.line .detail { color: var(--muted); word-break: break-word; }
+	.line.ok .name { color: var(--ok); }
+	.line.bad .name { color: var(--bad); }
+	.line.bad .detail { color: #fca5a5; }
+
+	.hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+</style>
+</head>
+<body>
+	<header>
+		<h1>electron-plugin-<em>keygate</em> demo</h1>
+		<span class="server">server <b id="server">…</b></span>
+		<span class="badge" id="offline" hidden>offline · cached</span>
+		<span class="spacer"></span>
+		<span class="pill" id="pill" data-kind="idle">Checking</span>
+	</header>
+
+	<div class="grid">
+		<div style="display: grid; gap: 16px">
+			<section class="card">
+				<h2>License</h2>
+				<div id="license"></div>
+				<div class="chips" id="entitlements"></div>
+			</section>
+
+			<section class="card">
+				<h2>Entitlements from the server</h2>
+				<div id="features"></div>
+			</section>
+		</div>
+
+		<div style="display: grid; gap: 16px">
+			<section class="card">
+				<h2>Activate</h2>
+				<label for="key">License key</label>
+				<div class="key-row">
+					<input id="key" type="password" placeholder="KG-XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
+					<button id="reveal" type="button">Show</button>
+				</div>
+				<div class="buttons">
+					<button class="primary" id="activate" type="button" data-action>Activate</button>
+					<button id="verify" type="button" data-action>Verify</button>
+					<button id="entitlements" type="button" data-action>Entitlements</button>
+					<button id="deactivate" type="button" data-action>Deactivate</button>
+					<button id="reset" type="button" data-action>Reset state</button>
+					<button id="forget" type="button" data-action>Forget key</button>
+					<button id="refresh" type="button" data-action>Refresh</button>
+				</div>
+				<p class="hint">
+					The key goes to the main process and is stored under the OS vault. The renderer
+					never sees it again — only the license state comes back.
+				</p>
+			</section>
+
+			<section class="card">
+				<h2>Activity</h2>
+				<div class="log" id="log"></div>
+			</section>
+		</div>
+	</div>
+
+	<script src="./renderer.js"></script>
+</body>
+</html>
