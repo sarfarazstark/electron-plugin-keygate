@@ -65,6 +65,7 @@ and talks to your users' machines.
 - [This is a Keygate client, not a Keygen one](#-this-is-a-keygate-client-not-a-keygen-one)
 - [Deliberately absent](#-deliberately-absent)
 - [Testing](#-testing)
+- [Documentation](#-documentation)
 - [Releasing](#-releasing)
 - [Licence](#-licence)
 
@@ -606,6 +607,26 @@ so the activation looks like a real one. Release it again with:
 ```sh
 npm run activate:live -- --release <identifier>
 ```
+
+<br />
+
+## 📚 Documentation
+
+The README is the front door. `docs/` is the longer form — the reasoning
+behind the design, the security model, the rules of the offline window, and
+how to verify an integration before shipping it. It ships inside the package,
+so it is on disk after `npm install` too.
+
+| | |
+| --- | --- |
+| [Getting started](docs/getting-started.md) | From `npm install` to a feature that unlocks for a licensed customer, and a table of the things that go wrong. |
+| [Architecture](docs/architecture.md) | Where the credential lives, what a call actually does, and the two packaging rules that decide whether a packaged app finds the preload. |
+| [Security](docs/security.md) | The threat model, one defence at a time — and the limits, stated plainly. |
+| [Offline](docs/offline.md) | The signed token, field by field. The two clocks the server keeps, and the trap in the signature scheme. |
+| [Keygate vs Keygen](docs/keygate-vs-keygen.md) | Why this is not a drop-in for a Keygen client, side by side. |
+| [Testing](docs/testing.md) | The test layers, the live checks, and a checklist for your own integration. |
+| [API reference](docs/api.md) | Every export, every shape, every error code. |
+| [Known issues and limits](docs/bugs.md) | What does not work, and what was left out on purpose. |
 
 <br />
 
