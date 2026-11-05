@@ -43,7 +43,7 @@
 		},
 		"./package.json": "./package.json"
 	},
-	"files": ["dist", "README.md", "API.md", "BUGS.md", "LICENSE"],
+	"files": ["dist", "README.md", "docs", "LICENSE"],
 	"scripts": {
 		"build": "node scripts/build.mjs",
 		"typecheck": "tsc -p tsconfig.json --noEmit",

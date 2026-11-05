@@ -163,6 +163,9 @@ rather than at the package. Resolving relative to it produced a path
 inside the app's own directory, where there is no preload file, and the
 renderer silently found no bridge.
 
+See [Architecture](architecture.md#the-two-packaging-rules) for the rest of
+the packaging rules.
+
 ---
 
 ## Renderer

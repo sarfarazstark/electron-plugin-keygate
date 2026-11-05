@@ -3,6 +3,11 @@
 What this package does not do, and where the edges are. Each item says
 whether it was verified here and what that means.
 
+The other pages in this folder explain *how* each of these works —
+[Architecture](architecture.md), [Security](security.md) and
+[Offline](offline.md). This one is the register of what was **verified
+here**, and where.
+
 ## The offline window
 
 The single most important limit.
