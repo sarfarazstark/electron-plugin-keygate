@@ -17,6 +17,11 @@ if (license.entitlements.includes('premium_support')) {
 }
 ```
 
+![The demo activating a license](https://raw.githubusercontent.com/sarfarazstark/electron-plugin-keygate/main/assets/demo-activation.gif)
+
+That is [`examples/demo`](examples/demo) — a small Electron app that activates
+a license and shows what the server said. Run it with three commands.
+
 <br />
 
 ## 🔌 Powered by Keygate
@@ -624,8 +629,6 @@ cd examples/demo
 npm install
 npm start
 ```
-
-![The demo activating a license](https://raw.githubusercontent.com/sarfarazstark/electron-plugin-keygate/main/assets/demo-activation.gif)
 
 It points at `http://localhost:9000` unless you say otherwise, and it shows
 the server it is really using in the footer, so there is no guessing about
