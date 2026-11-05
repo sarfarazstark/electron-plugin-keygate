@@ -53,12 +53,12 @@ and talks to your users' machines.
   - [resetLicense() and resetLicenseKey()](#-resetlicense-and-resetlicensekey)
 - [How it fits together](#-how-it-fits-together)
 - [The security model](#-the-security-model)
-  - [Sender trust](#-sender-trust)
-  - [Argument validation](#-argument-validation)
-  - [Storage](#-storage)
+  - [Sender trust](#sender-trust)
+  - [Argument validation](#argument-validation)
+  - [Storage](#storage)
 - [The offline window](#-the-offline-window)
-  - [The signed token](#-the-signed-token)
-  - [When the server withdraws the license](#-when-the-server-withdraws-the-license)
+  - [The signed token](#the-signed-token)
+  - [When the server withdraws the license](#when-the-server-withdraws-the-license)
 - [Error codes](#-error-codes)
 - [What this package is for](#-what-this-package-is-for)
   - [Licensing a person, not a machine](#-licensing-a-person-not-a-machine)
@@ -70,7 +70,7 @@ and talks to your users' machines.
 
 <br />
 
-## ⬇️ Install
+## 📦 Install
 
 ```sh
 npm install electron-plugin-keygate
@@ -81,9 +81,9 @@ dependencies** — `node:crypto` and `node:fs` are enough.
 
 <br />
 
-## 🛠️ Setup
+## 🛠 Setup
 
-### ⚙️ Main process
+### 🔧 Main process
 
 ```ts
 import { app, BrowserWindow, ipcMain } from 'electron';
@@ -175,7 +175,7 @@ webPreferences: {
 }
 ```
 
-### 🖥️ Renderer
+### 🖥 Renderer
 
 ```ts
 import { keygate, isKeygateError } from 'electron-plugin-keygate/renderer';
@@ -285,7 +285,7 @@ The server does not check the license's status here: a suspended or expired
 license can still free its slots, which is what makes this useful for a
 customer moving machines.
 
-### 🎟️ `getEntitlements()`
+### 🔖 `getEntitlements()`
 
 The license's feature map, with quota usage when the server is reachable.
 
@@ -338,7 +338,7 @@ await keygate.resetLicenseKey(); // forget the key too
 
 <br />
 
-## 🏗️ How it fits together
+## 🧩 How it fits together
 
 ![How the pieces fit together](https://raw.githubusercontent.com/sarfarazstark/electron-plugin-keygate/main/assets/architecture.png)
 
@@ -558,6 +558,7 @@ compatibility feature.
 | `npm run typecheck` | TypeScript, no emit. |
 | `npm run build` | Bundles the five entry points and writes the declarations. |
 | `npm run smoke` | Checks that every entry point and the `exports` map resolve. |
+| `npm run check:readme` | Checks that every table-of-contents link points at a heading that exists. |
 | `npm run verify:electron` | A real Electron, a sandboxed renderer, every channel. |
 | `npm run verify:packaged` | Installs the tarball into an app, packages it, runs it. |
 | `npm run assets` | Redraws the README images. |
