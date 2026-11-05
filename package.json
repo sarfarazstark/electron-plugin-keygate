@@ -58,6 +58,7 @@
 		"activate:live": "node scripts/activate-live.mjs",
 		"verify:packaged": "npm run build && node scripts/verify-packaged.mjs",
 		"smoke": "node scripts/smoke.mjs",
+		"check:readme": "node scripts/check-readme.mjs",
 		"assets": "node scripts/build-assets.mjs",
 		"prepublishOnly": "npm run build"
 	},
