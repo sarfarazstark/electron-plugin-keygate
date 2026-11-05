@@ -15,30 +15,37 @@ Where the credential lives, and why it does not live in the page.
 
 ## The shape
 
-![How the pieces fit together](https://raw.githubusercontent.com/sarfarazstark/electron-plugin-keygate/main/assets/architecture.png)
+```mermaid
+flowchart TB
+    R["<b>Renderer</b><br/>sandboxed · no Node<br/><i>eight methods, never the key</i>"]
+    P["<b>Preload</b><br/>the only surface<br/><i>one file · electron only</i>"]
+    M["<b>Main process</b><br/>IPC · client · storage<br/><i>holds the key and the token</i>"]
+    S["<b>Keygate server</b><br/><i>/license/activate · verify · deactivate</i>"]
+    V["<b>OS vault</b><br/><i>DPAPI · Keychain · libsecret</i>"]
+
+    R -->|"window.keygate"| P
+    P -->|"8 IPC channels"| M
+    M -->|"HTTPS"| S
+    M -->|"safeStorage"| V
+
+    classDef app fill:#f5f3ff,stroke:#7c3aed,stroke-width:1.5px,color:#2f2745
+    classDef remote fill:#ffffff,stroke:#a9a2bd,stroke-width:1.5px,color:#2f2745
+    classDef local fill:#f2faf6,stroke:#11724a,stroke-width:1.5px,color:#2f2745
+
+    class R,P,M app
+    class S remote
+    class V local
+```
 
 Three processes, and one rule: **the credential stays in the main process.**
 The renderer asks for things; it never holds the license key and never
 talks to the server.
 
-```
-                    ┌───────────────────────────────┐
-                    │  renderer  (sandboxed)        │
-                    │  eight methods, no key        │
-                    └───────────────┬───────────────┘
-                                    │  window.keygate
-                    ┌───────────────▼───────────────┐
-                    │  preload  (the only surface)  │
-                    └───────────────┬───────────────┘
-                                    │  keygate:*
-                    ┌───────────────▼───────────────┐
-                    │  main process  (Node)         │
-                    └───┬───────────────────────┬───┘
-                        │ HTTPS                 │ safeStorage
-              ┌─────────▼─────────┐   ┌─────────▼─────────┐
-              │  Keygate server   │   │    OS vault       │
-              └───────────────────┘   └───────────────────┘
-```
+That diagram is **Mermaid**, and this block is its source — GitHub renders
+it live here. `npm run assets` renders the same block to
+`assets/architecture.png`, which is what the README shows, because the npm
+package page does not render Mermaid. Edit the block above, run the script,
+and both stay in step.
 
 ## What lives where
 

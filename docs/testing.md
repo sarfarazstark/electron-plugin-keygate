@@ -47,7 +47,7 @@ npm run test:live     # needs the environment below
 | `npm run verify:live` | the client against a live server, reporting each step |
 | `npm run verify:live-electron` | a real Electron, the real OS vault, a real server |
 | `npm run activate:live` | activates **this** machine and leaves it active |
-| `npm run assets` | redraws the README images |
+| `npm run assets` | redraws the README images, including the Mermaid diagram |
 
 `verify:electron` and `verify:packaged` need no server and no key. They are
 the ones to run in CI on every commit.

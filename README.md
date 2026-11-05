@@ -562,7 +562,7 @@ compatibility feature.
 | `npm run check:readme` | Checks that every table-of-contents link points at a heading that exists. |
 | `npm run verify:electron` | A real Electron, a sandboxed renderer, every channel. |
 | `npm run verify:packaged` | Installs the tarball into an app, packages it, runs it. |
-| `npm run assets` | Redraws the README images. |
+| `npm run assets` | Redraws the README images, including the Mermaid diagram. |
 
 The checks that need a real server take the URL and the key from the
 environment. **The key is never written to disk** — only ciphertext is:
