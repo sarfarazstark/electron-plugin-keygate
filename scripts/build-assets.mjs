@@ -4,9 +4,9 @@
  *
  * The banner is drawn as HTML and screenshotted with Electron, so the type is
  * exact and the colours come from Keygate's own logo. The architecture
- * diagram is **Mermaid**: `assets/architecture.mmd` is the source, and this
- * script renders it to `assets/architecture.png` — the npm package page does
- * not render Mermaid, so the README needs the PNG.
+ * diagram is **Mermaid**: the block in `docs/architecture.md` is the source,
+ * and this script renders it to `assets/architecture.png` — the npm package
+ * page does not render Mermaid, so the README needs the PNG.
  *
  *   npm run assets
  *

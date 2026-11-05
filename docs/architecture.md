@@ -16,6 +16,7 @@ Where the credential lives, and why it does not live in the page.
 ## The shape
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 440}} }%%
 flowchart TB
     R["<b>Renderer</b><br/>sandboxed · no Node<br/><i>eight methods, never the key</i>"]
     P["<b>Preload</b><br/>the only surface<br/><i>one file · electron only</i>"]
@@ -45,7 +46,8 @@ That diagram is **Mermaid**, and this block is its source — GitHub renders
 it live here. `npm run assets` renders the same block to
 `assets/architecture.png`, which is what the README shows, because the npm
 package page does not render Mermaid. Edit the block above, run the script,
-and both stay in step.
+and both stay in step. The block carries its own layout settings, so GitHub
+and the PNG break the labels in the same places.
 
 ## What lives where
 
