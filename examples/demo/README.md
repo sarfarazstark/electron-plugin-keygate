@@ -1,13 +1,15 @@
 # Demo app
 
 A runnable Electron app that drives `electron-plugin-keygate` end to end:
-activate a key, read the license back, ask the server for the entitlements,
-release the device slot, and clear the cached state.
+activate a key, read the license back, check in with the server, release
+the device slot, and clear the cached state.
 
 It is the wiring from the README, in a window you can click — no mock
 server, no fixtures. The renderer imports
 `electron-plugin-keygate/renderer`, exactly as application code does, and
 never touches the key storage, the token, or the channel names.
+
+![The demo activating a license](https://raw.githubusercontent.com/sarfarazstark/electron-plugin-keygate/main/assets/demo-activation.gif)
 
 ## Run it
 
@@ -24,7 +26,26 @@ npm install
 npm start
 ```
 
-`npm start` bundles the app with esbuild and opens it.
+`npm start` bundles the app and opens it.
+
+## The stack
+
+| | |
+| --- | --- |
+| Renderer | React 19, Vite, Tailwind CSS v4 |
+| UI | shadcn/ui components, copied from the [Watermelon UI](https://ui.watermelon.sh) registry |
+| Main process | esbuild, `electron` external |
+
+The components are vendored, not a dependency — the shadcn CLI copies the
+source into `src/components/ui/`, so it is yours to edit. To pull them
+again after a registry update:
+
+```sh
+npx shadcn@latest add @watermelon/button @watermelon/input @watermelon/card @watermelon/badge @watermelon/label @watermelon/separator -o
+```
+
+`components.json` points at the registry. The theme is the shadcn default
+in `src/index.css` — neutral, light, no gradients.
 
 ## Point it at a server
 
@@ -35,7 +56,7 @@ npm start
 | `KEYGATE_IDENTIFIER` | Override the device identifier. | this machine's id |
 
 The default points at a **local** Keygate server, so the demo never talks
-to production unless you ask it to. The URL in the header is the one it is
+to production unless you ask it to. The URL in the footer is the one it is
 really using.
 
 The public key is fetched from the server and cached on first use. Pin it
@@ -46,18 +67,15 @@ out — which is what you want in anything you ship.
 
 | Button | Call | What you should see |
 | --- | --- | --- |
-| **Activate** | `activate({ key })` | The license appears, the status pill turns green. |
+| **Activate** | `activate({ key })` | The license appears, the badge turns to *Licensed*. |
 | **Verify** | `verify({})` | A fresh check-in against the server. |
-| **Entitlements** | `getEntitlements({})` | The plan and every feature, with its usage. |
 | **Deactivate** | `deactivate({})` | This device's slot is released. |
-| **Reset state** | `resetLicense()` | The cached license is forgotten; the key stays. |
-| **Forget key** | `resetLicenseKey()` | The cached key is forgotten too. |
-| **Refresh** | `getLicense()` | Re-reads the local state, no network. |
+| **Reset** | `resetLicense()` | The cached license is forgotten; the key stays. |
 
-The **Activity** panel is the interesting part: every failure arrives as a
-`KeygateError` with a `code` you can branch on — `LICENSE_EXPIRED`,
-`ACTIVATION_LIMIT`, `DEVICE_HELD`, `LICENSING_DISABLED` — plus the
-server's own `detail`.
+The **Licensed** badge is the whole point: it is only ever set after the
+signed token verified against the server's public key. A failure shows the
+server's own code — `LICENSE_NOT_FOUND`, `ACTIVATION_LIMIT`,
+`DEVICE_HELD`, `LICENSING_DISABLED` — with its `detail`.
 
 ## The offline path
 

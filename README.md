@@ -614,8 +614,9 @@ npm run activate:live -- --release <identifier>
 ## 🖥 Try it
 
 [`examples/demo`](examples/demo) is a runnable Electron app that drives the
-whole surface — activate, verify, read the entitlements, release the slot,
-clear the state. It is the wiring from **Setup**, with buttons.
+whole surface — activate, verify, release the slot, clear the state. It is
+the wiring from **Setup**, with buttons. The UI is React and shadcn/ui,
+copied from the [Watermelon UI](https://ui.watermelon.sh) registry.
 
 ```sh
 npm run build          # in the repository root
@@ -624,8 +625,10 @@ npm install
 npm start
 ```
 
+![The demo activating a license](https://raw.githubusercontent.com/sarfarazstark/electron-plugin-keygate/main/assets/demo-activation.gif)
+
 It points at `http://localhost:9000` unless you say otherwise, and it shows
-the server it is really using in the header, so there is no guessing about
+the server it is really using in the footer, so there is no guessing about
 where a license was checked.
 
 The other two examples are not apps to click:

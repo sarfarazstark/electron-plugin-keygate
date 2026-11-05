@@ -22,11 +22,10 @@ const windows = new Set();
 
 app.whenReady().then(async () => {
 	const window = new BrowserWindow({
-		width: 1000,
-		height: 760,
-		minWidth: 760,
-		minHeight: 560,
-		backgroundColor: '#0f0c1c',
+		width: 520,
+		height: 840,
+		minWidth: 420,
+		minHeight: 520,
 		title: 'Keygate demo',
 		webPreferences: {
 			// The sandboxed bridge: one self-contained CommonJS file that a
