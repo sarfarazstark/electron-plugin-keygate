@@ -1,22 +1,22 @@
 {
-  "name": "keygate-demo",
-  "version": "1.0.0",
-  "description": "A runnable Electron app that drives electron-plugin-keygate end to end: activate, verify, entitlements, deactivate, reset.",
-  "private": true,
-  "main": "./out/main/main.js",
-  "scripts": {
-    "build": "node build.mjs",
-    "start": "npm run build && electron ."
-  },
-  "dependencies": {
-    "electron-plugin-keygate": "file:../.."
-  },
-  "devDependencies": {
-    "electron": "^40.0.0",
-    "esbuild": "^0.25.0"
-  },
-  "allowScripts": {
-    "electron": true,
-    "esbuild": true
-  }
+	"name": "keygate-demo",
+	"version": "1.0.0",
+	"description": "A runnable Electron app that drives electron-plugin-keygate end to end: activate, verify, entitlements, deactivate, reset.",
+	"private": true,
+	"main": "./out/main/main.js",
+	"scripts": {
+		"build": "node build.mjs",
+		"start": "npm run build && electron ."
+	},
+	"dependencies": {
+		"electron-plugin-keygate": "file:../.."
+	},
+	"devDependencies": {
+		"electron": "^45.2.3",
+		"esbuild": "^0.25.0"
+	},
+	"allowScripts": {
+		"electron": true,
+		"esbuild": true
+	}
 }
