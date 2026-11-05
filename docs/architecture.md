@@ -22,18 +22,22 @@ The renderer asks for things; it never holds the license key and never
 talks to the server.
 
 ```
-┌──────────────┐   window.keygate   ┌──────────────┐   keygate:*    ┌──────────────┐
-│   renderer   │ ─────────────────▶ │   preload    │ ────────────▶ │    main      │
-│  (sandboxed) │                    │  (the only   │               │  (Node)      │
-└──────────────┘                    │   surface)   │               └──────┬───────┘
-                                      └──────────────┘                      │
-                                                                    ┌────────┴────────┐
-                                                              HTTPS   │                 │  safeStorage
-                                                                    ▼                 ▼
-                                                           ┌─────────────┐      ┌──────────────┐
-                                                           │   Keygate   │      │   OS vault   │
-                                                           │   server    │      │  (DPAPI, …)  │
-                                                           └─────────────┘      └──────────────┘
+                    ┌───────────────────────────────┐
+                    │  renderer  (sandboxed)        │
+                    │  eight methods, no key        │
+                    └───────────────┬───────────────┘
+                                    │  window.keygate
+                    ┌───────────────▼───────────────┐
+                    │  preload  (the only surface)  │
+                    └───────────────┬───────────────┘
+                                    │  keygate:*
+                    ┌───────────────▼───────────────┐
+                    │  main process  (Node)         │
+                    └───┬───────────────────────┬───┘
+                        │ HTTPS                 │ safeStorage
+              ┌─────────▼─────────┐   ┌─────────▼─────────┐
+              │  Keygate server   │   │    OS vault       │
+              └───────────────────┘   └───────────────────┘
 ```
 
 ## What lives where
